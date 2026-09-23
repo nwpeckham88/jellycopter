@@ -1,0 +1,15 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/app/build
+/plugin/bin
+/plugin/obj
+/plugin/Jellyfin.Plugin.Jellycopter/bin
+/plugin/Jellyfin.Plugin.Jellycopter/obj
+.kotlin
+.pytest_cache
+.agents
+*.compiler.options

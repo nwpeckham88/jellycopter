@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Jellycopter Configuration</title>
+</head>
+<body>
+    <div id="JellycopterConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <div style="margin-bottom: 2em; display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #7C3AED, #A855F7); display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);">
+                        🚁
+                    </div>
+                    <div>
+                        <h2 style="margin: 0; font-size: 1.6em; font-weight: 700; color: #FFFFFF;">Jellycopter</h2>
+                        <span style="font-size: 0.9em; color: #A1A1AA;">Smart Shuffle & Cross-Device Telemetry Companion</span>
+                    </div>
+                </div>
+
+                <form id="JellycopterConfigForm" style="max-width: 650px;">
+                    <div class="sectionTitleContainer">
+                        <h3 class="sectionTitle" style="color: #DDD; font-size: 1.1em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">Sync Settings</h3>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription" style="margin: 1.5em 0;">
+                        <label class="emby-checkbox-label">
+                            <input id="chkEnableDeckSync" name="chkEnableDeckSync" type="checkbox" is="emby-checkbox" />
+                            <span>Enable Smart Shuffle Deck Synchronization</span>
+                        </label>
+                        <div class="fieldDescription" style="color: #9CA3AF; margin-left: 32px; font-size: 0.9em;">
+                            Synchronizes dynamic exhaustion decks, midway resume points, and anti-clustering state between all Jellycopter clients.
+                        </div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription" style="margin: 1.5em 0;">
+                        <label class="emby-checkbox-label">
+                            <input id="chkEnableAchievementSync" name="chkEnableAchievementSync" type="checkbox" is="emby-checkbox" />
+                            <span>Enable Achievement & Milestone Sync</span>
+                        </label>
+                        <div class="fieldDescription" style="color: #9CA3AF; margin-left: 32px; font-size: 0.9em;">
+                            Persists viewing milestones (e.g. <em>Binge Voyager</em>, <em>Shuffle Centurion</em>) and Trophy Room unlocks to the server.
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 2.5em;">
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button" style="background: #7C3AED; color: #FFF; border-radius: 8px; font-weight: 600; padding: 0.8em 2em;">
+                            <span>Save Changes</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            var JellycopterConfig = {
+                pluginId: "3b49e6f2-78d1-419b-a452-9c125df1a89c"
+            };
+
+            document.querySelector('#JellycopterConfigPage')
+                .addEventListener('pageshow', function () {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(JellycopterConfig.pluginId).then(function (config) {
+                        document.querySelector('#chkEnableDeckSync').checked = config.EnableDeckSync !== false;
+                        document.querySelector('#chkEnableAchievementSync').checked = config.EnableAchievementSync !== false;
+                        Dashboard.hideLoadingMsg();
+                    }).catch(function () {
+                        Dashboard.hideLoadingMsg();
+                    });
+                });
+
+            document.querySelector('#JellycopterConfigForm')
+                .addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(JellycopterConfig.pluginId).then(function (config) {
+                        config.EnableDeckSync = document.querySelector('#chkEnableDeckSync').checked;
+                        config.EnableAchievementSync = document.querySelector('#chkEnableAchievementSync').checked;
+                        ApiClient.updatePluginConfiguration(JellycopterConfig.pluginId, config).then(function (result) {
+                            Dashboard.processPluginConfigurationUpdateResult(result);
+                        });
+                    });
+                });
+        </script>
+    </div>
+</body>
+</html>
