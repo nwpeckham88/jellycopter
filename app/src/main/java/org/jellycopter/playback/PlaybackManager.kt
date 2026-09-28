@@ -116,7 +116,16 @@ class PlaybackManager(
 
             override fun onPlaybackEnded() {
                 if (_activeEngine.value == ActiveEngine.MEDIA3_EXOPLAYER) {
-                    _playerState.update { it.copy(isPlaying = false, isEnded = true) }
+                    val pos = primaryPlayer.currentPositionMs
+                    val dur = primaryPlayer.durationMs
+                    _playerState.update {
+                        it.copy(
+                            isPlaying = false,
+                            isEnded = true,
+                            positionMs = if (dur > 0L) maxOf(pos, dur) else pos,
+                            durationMs = dur
+                        )
+                    }
                 }
             }
         })
@@ -151,7 +160,16 @@ class PlaybackManager(
 
             override fun onPlaybackEnded() {
                 if (_activeEngine.value == ActiveEngine.LIBMPV) {
-                    _playerState.update { it.copy(isPlaying = false, isEnded = true) }
+                    val pos = fallbackPlayer.currentPositionMs
+                    val dur = fallbackPlayer.durationMs
+                    _playerState.update {
+                        it.copy(
+                            isPlaying = false,
+                            isEnded = true,
+                            positionMs = if (dur > 0L) maxOf(pos, dur) else pos,
+                            durationMs = dur
+                        )
+                    }
                 }
             }
         })
@@ -161,7 +179,7 @@ class PlaybackManager(
         currentCard = item
         val episode = item.items.firstOrNull()
         val targetItemId = episode?.id ?: item.id
-        val isJellyfinId = targetItemId.length in 32..36 && targetItemId.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it == '-' }
+        val isJellyfinId = !targetItemId.startsWith("ep_") && !targetItemId.startsWith("mock_") && targetItemId.isNotBlank()
         val session = sessionStorage?.getSession()
         val uri = if (isJellyfinId && session != null && session.serverUrl.isNotBlank()) {
             val base = session.serverUrl.trim().removeSuffix("/")

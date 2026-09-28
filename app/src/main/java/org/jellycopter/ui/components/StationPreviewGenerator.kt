@@ -43,9 +43,41 @@ object StationPreviewGenerator {
     private val json = Json { ignoreUnknownKeys = true }
 
     fun extractShowIds(showsJson: String): List<String> {
-        return runCatching {
-            json.decodeFromString<List<String>>(showsJson)
-        }.getOrDefault(emptyList())
+        val trimmed = showsJson.trim()
+        if (trimmed.isEmpty() || trimmed == "[]") return emptyList()
+
+        // 1. Try decoding standard JSON array of strings: ["id1", "id2"]
+        val listResult = runCatching {
+            json.decodeFromString<List<String>>(trimmed)
+        }.getOrNull()
+        if (!listResult.isNullOrEmpty()) {
+            return listResult.map { it.removePrefix("series:").removePrefix("channel:").trim() }.filter { it.isNotEmpty() }
+        }
+
+        // 2. Try decoding JSON single string: "id1"
+        val singleResult = runCatching {
+            json.decodeFromString<String>(trimmed)
+        }.getOrNull()
+        if (!singleResult.isNullOrBlank()) {
+            return listOf(singleResult.removePrefix("series:").removePrefix("channel:").trim()).filter { it.isNotEmpty() }
+        }
+
+        // 3. Fallback: Parse bracketed strings like "[id1, id2]"
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            val unbracketed = trimmed.removePrefix("[").removeSuffix("]").trim()
+            if (unbracketed.isEmpty()) return emptyList()
+            return unbracketed.split(",")
+                .map { it.trim().trim('"', '\'').removePrefix("series:").removePrefix("channel:").trim() }
+                .filter { it.isNotEmpty() }
+        }
+
+        // 4. Handle prefixed show ID e.g. "series:series_1"
+        if (trimmed.startsWith("series:") || trimmed.startsWith("channel:")) {
+            val clean = trimmed.removePrefix("series:").removePrefix("channel:").trim()
+            if (clean.isNotEmpty()) return listOf(clean)
+        }
+
+        return emptyList()
     }
 
     fun resolveArtwork(showsJson: String, mediaRepository: MediaRepository?): StationArtwork {

@@ -91,7 +91,11 @@ class PlaybackCoordinator(
      */
     suspend fun onEpisodeCompleted(positionMs: Long, durationMs: Long): NextAction {
         val ctx = _currentContext.value ?: return NextAction.Stop
-        val outcome = watchHistoryDecoupler.evaluateProgress(positionMs, durationMs)
+        val outcome = if (durationMs <= 0L || positionMs >= durationMs) {
+            PlaybackOutcome.COMPLETED
+        } else {
+            watchHistoryDecoupler.evaluateProgress(positionMs, durationMs)
+        }
 
         return when (ctx.source) {
             CoordinatorSource.NORMAL -> {

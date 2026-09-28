@@ -63,4 +63,19 @@ class StationPreviewGeneratorTest {
         assertEquals("Better Call Saul", titles[1])
         assertEquals("s3", titles[2])
     }
+
+    @Test
+    fun testExtractShowIdsSingleShowAndPrefixed() {
+        // Direct prefixed series ID
+        val prefixed = StationPreviewGenerator.extractShowIds("series:show-123")
+        assertEquals(listOf("show-123"), prefixed)
+
+        // Single JSON string
+        val singleJson = StationPreviewGenerator.extractShowIds("\"show-456\"")
+        assertEquals(listOf("show-456"), singleJson)
+
+        // Bracketed single unquoted ID
+        val bracketed = StationPreviewGenerator.extractShowIds("[show-789]")
+        assertEquals(listOf("show-789"), bracketed)
+    }
 }

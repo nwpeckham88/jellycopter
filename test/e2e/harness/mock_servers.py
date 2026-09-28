@@ -3,7 +3,7 @@ Mock Jellyfin, Jellyseerr v2.7.3, and Companion Plugin HTTP Server Harness.
 Permits end-to-end network integration testing of all REST and sync protocols.
 """
 
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import json
 import threading
 import urllib.parse
@@ -13,6 +13,7 @@ from typing import Dict, Any, List, Optional
 class MockServerState:
     """Holds mutable in-memory state across all mock endpoints."""
     def __init__(self):
+        self.lock = threading.Lock()
         # Jellyfin State
         self.users = {"user_1": {"Id": "user_1", "Name": "Nathan"}}
         self.episodes = {}  # ep_id -> dict
@@ -240,17 +241,24 @@ class MockApiHandler(BaseHTTPRequestHandler):
             mid = payload.get("mediaId")
             key = (mtype, mid)
 
-            if key in self.state.existing_requests:
+            with self.state.lock:
+                if key in self.state.existing_requests:
+                    already_exists = True
+                else:
+                    already_exists = False
+                    self.state.existing_requests.add(key)
+                    self.state.requests_log.append(payload)
+                    req_id = len(self.state.requests_log)
+
+            if already_exists:
                 self._send_json(409, {
                     "message": "Request already exists",
                     "statusCode": 409
                 })
                 return
 
-            self.state.existing_requests.add(key)
-            self.state.requests_log.append(payload)
             self._send_json(201, {
-                "id": len(self.state.requests_log),
+                "id": req_id,
                 "status": 2,  # PENDING APPROVAL / PROCESSING
                 "media": {"id": mid, "mediaType": mtype},
                 "seasons": payload.get("seasons", "all")
@@ -304,7 +312,8 @@ class MockServerHarness:
     def __init__(self, host: str = "127.0.0.1", port: int = 0):
         self.state = MockServerState()
         MockApiHandler.state = self.state
-        self.server = HTTPServer((host, port), MockApiHandler)
+        self.server = ThreadingHTTPServer((host, port), MockApiHandler)
+        self.server.daemon_threads = True
         self.host, self.port = self.server.server_address
         self.base_url = f"http://{self.host}:{self.port}"
         self._thread = threading.Thread(target=self.server.serve_forever, daemon=True)

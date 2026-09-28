@@ -37,7 +37,8 @@ object JellyfinImageUrlBuilder {
         fillWidth: Int? = null,
         quality: Int? = null
     ): String {
-        val base = "${serverUrl.trim().removeSuffix("/")}/Items/$itemId/Images/Primary"
+        val cleanId = itemId.removePrefix("series:").removePrefix("channel:").trim()
+        val base = "${serverUrl.trim().removeSuffix("/")}/Items/$cleanId/Images/Primary"
         val params = mutableListOf<String>()
         if (fillWidth != null) params.add("fillWidth=$fillWidth")
         if (quality != null) params.add("quality=$quality")
@@ -50,7 +51,8 @@ object JellyfinImageUrlBuilder {
         fillWidth: Int? = null,
         quality: Int? = null
     ): String {
-        val base = "${serverUrl.trim().removeSuffix("/")}/Items/$itemId/Images/Backdrop"
+        val cleanId = itemId.removePrefix("series:").removePrefix("channel:").trim()
+        val base = "${serverUrl.trim().removeSuffix("/")}/Items/$cleanId/Images/Backdrop"
         val params = mutableListOf<String>()
         if (fillWidth != null) params.add("fillWidth=$fillWidth")
         if (quality != null) params.add("quality=$quality")
@@ -102,13 +104,15 @@ class DefaultMediaRepository(
     }
 
     override fun buildPrimaryImageUrl(itemId: String): String? {
-        val session = sessionStorage?.getSession() ?: return MockMediaDataset.getSeriesPoster(itemId)
-        return JellyfinImageUrlBuilder.buildPrimaryImageUrl(session.serverUrl, itemId)
+        val cleanId = itemId.removePrefix("series:").removePrefix("channel:").trim()
+        val session = sessionStorage?.getSession() ?: return MockMediaDataset.getSeriesPoster(cleanId)
+        return JellyfinImageUrlBuilder.buildPrimaryImageUrl(session.serverUrl, cleanId)
     }
 
     override fun buildBackdropImageUrl(itemId: String): String? {
-        val session = sessionStorage?.getSession() ?: return MockMediaDataset.getSeriesBackdrop(itemId)
-        return JellyfinImageUrlBuilder.buildBackdropImageUrl(session.serverUrl, itemId)
+        val cleanId = itemId.removePrefix("series:").removePrefix("channel:").trim()
+        val session = sessionStorage?.getSession() ?: return MockMediaDataset.getSeriesBackdrop(cleanId)
+        return JellyfinImageUrlBuilder.buildBackdropImageUrl(session.serverUrl, cleanId)
     }
 
     override suspend fun getVirtualFolders(): List<VirtualFolder> = withContext(ioDispatcher) {
@@ -606,10 +610,14 @@ object MockMediaDataset {
     }
 
     fun getSeriesPoster(itemId: String): String? {
-        return mockSeriesDetails[itemId]?.posterUrl
+        val cleanId = itemId.removePrefix("series:").removePrefix("channel:").trim()
+        return mockSeriesDetails[cleanId]?.posterUrl
+            ?: mockSeriesDetails.values.firstOrNull { it.name.equals(cleanId, ignoreCase = true) }?.posterUrl
     }
 
     fun getSeriesBackdrop(itemId: String): String? {
-        return mockSeriesDetails[itemId]?.backdropUrl
+        val cleanId = itemId.removePrefix("series:").removePrefix("channel:").trim()
+        return mockSeriesDetails[cleanId]?.backdropUrl
+            ?: mockSeriesDetails.values.firstOrNull { it.name.equals(cleanId, ignoreCase = true) }?.backdropUrl
     }
 }

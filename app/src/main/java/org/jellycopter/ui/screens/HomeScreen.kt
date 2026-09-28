@@ -127,7 +127,8 @@ fun HomeScreen(
                 val isChannel = deck.channelId != null || deck.deckId.startsWith("channel:")
                 val currentItem = deck.currentCard?.items?.firstOrNull()
                 val firstItem = deck.cards.firstOrNull()?.items?.firstOrNull()
-                val effectiveSeriesId = currentItem?.seriesId ?: firstItem?.seriesId ?: deck.seriesId
+                val rawSeriesId = currentItem?.seriesId ?: firstItem?.seriesId ?: deck.seriesId ?: deck.deckId.removePrefix("series:")
+                val effectiveSeriesId = rawSeriesId?.removePrefix("series:")?.removePrefix("channel:")?.trim()
                 val deckTitle = if (isChannel && deck.name.isNotBlank()) {
                     deck.name
                 } else {

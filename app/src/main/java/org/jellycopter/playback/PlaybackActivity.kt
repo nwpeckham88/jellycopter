@@ -110,8 +110,11 @@ class PlaybackActivity : ComponentActivity() {
         const val EXTRA_ITEM_ID = "item_id"
         const val EXTRA_EPISODE_TITLE = "episode_title"
         const val EXTRA_SERIES_TITLE = "series_title"
+        const val EXTRA_SERIES_ID = "series_id"
+        const val EXTRA_SEASON_ID = "season_id"
         const val EXTRA_SEASON_NUMBER = "season_number"
         const val EXTRA_EPISODE_NUMBER = "episode_number"
+        const val EXTRA_RUNTIME_TICKS = "runtime_ticks"
         const val EXTRA_START_POSITION_MS = "start_position_ms"
         const val EXTRA_SOURCE = "playback_source"       // "NORMAL" | "SHUFFLE" | "CHANNEL"
         const val EXTRA_DECK_ID = "deck_id"
@@ -122,8 +125,11 @@ class PlaybackActivity : ComponentActivity() {
                 putExtra(EXTRA_ITEM_ID, episode.id)
                 putExtra(EXTRA_EPISODE_TITLE, episode.name)
                 putExtra(EXTRA_SERIES_TITLE, episode.seriesName)
+                putExtra(EXTRA_SERIES_ID, episode.seriesId)
+                putExtra(EXTRA_SEASON_ID, episode.seasonId)
                 putExtra(EXTRA_SEASON_NUMBER, episode.seasonNumber)
                 putExtra(EXTRA_EPISODE_NUMBER, episode.indexNumber)
+                putExtra(EXTRA_RUNTIME_TICKS, episode.runTimeTicks)
                 putExtra(EXTRA_START_POSITION_MS, startPositionMs)
                 putExtra(EXTRA_SOURCE, source.name)
                 deckId?.let { putExtra(EXTRA_DECK_ID, it) }
@@ -182,8 +188,11 @@ class PlaybackActivity : ComponentActivity() {
         val itemId = intent.getStringExtra(EXTRA_ITEM_ID) ?: ""
         val episodeTitle = intent.getStringExtra(EXTRA_EPISODE_TITLE) ?: "Episode"
         val seriesTitle = intent.getStringExtra(EXTRA_SERIES_TITLE) ?: ""
+        val seriesId = intent.getStringExtra(EXTRA_SERIES_ID)?.takeIf { it.isNotBlank() } ?: seriesTitle
+        val seasonId = intent.getStringExtra(EXTRA_SEASON_ID) ?: ""
         val seasonNum = intent.getIntExtra(EXTRA_SEASON_NUMBER, 1)
         val episodeNum = intent.getIntExtra(EXTRA_EPISODE_NUMBER, 1)
+        val runTimeTicks = intent.getLongExtra(EXTRA_RUNTIME_TICKS, 0L)
         val startPositionMs = intent.getLongExtra(EXTRA_START_POSITION_MS, 0L)
         currentDeckId = intent.getStringExtra(EXTRA_DECK_ID)
         currentChannelId = intent.getStringExtra(EXTRA_CHANNEL_ID)
@@ -194,11 +203,12 @@ class PlaybackActivity : ComponentActivity() {
         val initialEpisode = EpisodeItem(
             id = itemId,
             name = episodeTitle,
-            seriesId = seriesTitle,
+            seriesId = seriesId,
             seriesName = seriesTitle,
-            seasonId = "",
+            seasonId = seasonId,
             seasonNumber = seasonNum,
-            indexNumber = episodeNum
+            indexNumber = episodeNum,
+            runTimeTicks = runTimeTicks
         )
 
         currentEpisodeItem = initialEpisode
@@ -206,12 +216,13 @@ class PlaybackActivity : ComponentActivity() {
         currentSeriesTitle.value = seriesTitle
         currentSeasonNumber.intValue = seasonNum
         currentEpisodeNumber.intValue = episodeNum
+        durationMs.longValue = if (runTimeTicks > 0L) runTimeTicks / 10_000L else 0L
 
         val mediaCard = MediaCard(
             id = itemId,
-            seriesId = seriesTitle,
-            seasonId = "",
-            categoryKey = "default",
+            seriesId = seriesId,
+            seasonId = seasonId,
+            categoryKey = "s$seasonNum",
             items = listOf(initialEpisode)
         )
 
@@ -367,9 +378,12 @@ class PlaybackActivity : ComponentActivity() {
                     playbackCoordinator?.onEpisodeSkipped()
                 } else {
                     val state = playbackEngine?.playerState?.value
-                    val pos = state?.positionMs ?: positionMs.longValue
-                    val dur = state?.durationMs ?: durationMs.longValue
-                    playbackCoordinator?.onEpisodeCompleted(pos, dur)
+                    val cur = playbackEngine?.exoPlayer?.currentPosition ?: positionMs.longValue
+                    val dur = playbackEngine?.exoPlayer?.duration?.takeIf { it > 0 }
+                        ?: state?.durationMs?.takeIf { it > 0 }
+                        ?: durationMs.longValue
+                    val effectivePos = if (dur > 0L) maxOf(cur, state?.positionMs ?: 0L, dur) else maxOf(cur, state?.positionMs ?: 0L)
+                    playbackCoordinator?.onEpisodeCompleted(effectivePos, dur)
                 }
 
                 when (action) {
