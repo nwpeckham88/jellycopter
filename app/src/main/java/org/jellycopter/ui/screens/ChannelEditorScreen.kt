@@ -51,6 +51,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -85,13 +86,33 @@ fun ChannelEditorScreen(
     availableSeries: List<SeriesDetail> = emptyList(),
     mediaRepository: MediaRepository? = null,
     initialSeriesIds: List<String> = emptyList(),
+    initialChannelNumber: Int? = null,
+    existingChannels: List<ChannelEntity> = emptyList(),
     onSave: (ChannelEntity) -> Unit = {},
     onDelete: ((String) -> Unit)? = null,
     onCancel: () -> Unit = {}
 ) {
     val isEditing = existingChannel != null
 
+    val defaultChannelNumber = remember(existingChannel, initialChannelNumber, existingChannels) {
+        when {
+            existingChannel != null -> existingChannel.channelNumber.coerceAtLeast(3)
+            initialChannelNumber != null -> initialChannelNumber.coerceAtLeast(3)
+            existingChannels.isNotEmpty() -> {
+                val used = existingChannels.map { it.channelNumber }.toSet()
+                var cand = 3
+                while (cand in used) {
+                    cand++
+                }
+                cand
+            }
+            else -> 3
+        }
+    }
+
     var channelName by remember { mutableStateOf(existingChannel?.name ?: "") }
+    var channelNumber by remember { mutableStateOf(defaultChannelNumber) }
+    var channelNumberText by remember { mutableStateOf(defaultChannelNumber.toString()) }
     var channelDescription by remember { mutableStateOf(existingChannel?.description ?: "") }
     var interleaveStrategy by remember { mutableStateOf(existingChannel?.interleaveStrategy ?: "ROUND_ROBIN") }
     var audioNightMode by remember { mutableStateOf(existingChannel?.audioNightMode ?: "USE_GLOBAL") }
@@ -263,6 +284,149 @@ fun ChannelEditorScreen(
             )
         }
 
+        // Channel number selector
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                    .border(1.dp, Color(0x20FFFFFF), RoundedCornerShape(8.dp))
+                    .padding(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "CHANNEL NUMBER",
+                            color = textSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "TV dial position (Channel 3 or higher)",
+                            color = textSecondary.copy(alpha = 0.7f),
+                            fontSize = 12.sp
+                        )
+                    }
+                    Text(
+                        text = "CH $channelNumber",
+                        color = accent,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Decrement button
+                    FocusCard(
+                        onClick = {
+                            if (channelNumber > 3) {
+                                channelNumber--
+                                channelNumberText = channelNumber.toString()
+                            }
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.size(width = 56.dp, height = 48.dp)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    when {
+                                        channelNumber <= 3 -> surface.copy(alpha = 0.4f)
+                                        isFocused -> accent
+                                        else -> surface
+                                    }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Remove,
+                                contentDescription = "Decrease channel number",
+                                tint = when {
+                                    channelNumber <= 3 -> textSecondary.copy(alpha = 0.3f)
+                                    isFocused -> Color.Black
+                                    else -> textPrimary
+                                },
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    // Number input
+                    OutlinedTextField(
+                        value = channelNumberText,
+                        onValueChange = { input ->
+                            val digits = input.filter { it.isDigit() }
+                            channelNumberText = digits
+                            digits.toIntOrNull()?.let { num ->
+                                if (num >= 3) {
+                                    channelNumber = num
+                                }
+                            }
+                        },
+                        label = { Text("Channel #", color = textSecondary) },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Next
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onNext = {
+                                val parsed = channelNumberText.toIntOrNull() ?: channelNumber
+                                val clamped = parsed.coerceAtLeast(3)
+                                channelNumber = clamped
+                                channelNumberText = clamped.toString()
+                                focusManager.moveFocus(FocusDirection.Down)
+                            }
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = accent,
+                            unfocusedBorderColor = Color(0x20FFFFFF),
+                            focusedTextColor = textPrimary,
+                            unfocusedTextColor = textPrimary,
+                            cursorColor = accent
+                        ),
+                        singleLine = true
+                    )
+
+                    // Increment button
+                    FocusCard(
+                        onClick = {
+                            channelNumber++
+                            channelNumberText = channelNumber.toString()
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.size(width = 56.dp, height = 48.dp)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(if (isFocused) accent else surface),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Add,
+                                contentDescription = "Increase channel number",
+                                tint = if (isFocused) Color.Black else textPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // Optional description
         item {
             OutlinedTextField(
@@ -316,19 +480,31 @@ fun ChannelEditorScreen(
                     )
                     Spacer(modifier = Modifier.width(14.dp))
                     Column {
-                        Text(
-                            text = channelName.ifBlank { "New Station" },
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = textPrimary,
-                            maxLines = 1
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "CH $channelNumber",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = accent,
+                                modifier = Modifier
+                                    .background(accent.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = channelName.ifBlank { "New Station" },
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = textPrimary,
+                                maxLines = 1
+                            )
+                        }
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = if (selectedSeriesIds.isEmpty()) "No shows added yet"
                             else "${selectedSeriesIds.size} show${if (selectedSeriesIds.size == 1) "" else "s"} • ${interleaveStrategy.toReadable()}",
                             fontSize = 12.sp,
-                            color = accent
+                            color = textSecondary
                         )
                     }
                 }
@@ -516,12 +692,14 @@ fun ChannelEditorScreen(
                 FocusCard(
                     onClick = {
                         if (canSave) {
+                            val resolvedChannelNumber = (channelNumberText.toIntOrNull() ?: channelNumber).coerceAtLeast(3)
                             val showsJson = Json.encodeToString(selectedSeriesIds.toList())
                             val entity = ChannelEntity(
                                 channelId = existingChannel?.channelId ?: UUID.randomUUID().toString(),
                                 name = channelName.trim(),
                                 description = channelDescription.trim().ifBlank { null },
                                 showsJson = showsJson,
+                                channelNumber = resolvedChannelNumber,
                                 interleaveStrategy = interleaveStrategy,
                                 audioNightMode = audioNightMode,
                                 skipBehavior = skipBehavior,

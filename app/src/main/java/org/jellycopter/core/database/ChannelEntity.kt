@@ -10,6 +10,7 @@ data class ChannelEntity(
     val name: String,
     val description: String? = null,
     val showsJson: String = "[]",
+    val channelNumber: Int = 3,
     /** Interleave strategy: ROUND_ROBIN | RANDOM | WEIGHTED */
     val interleaveStrategy: String = "ROUND_ROBIN",
     /** Audio night mode: ON | OFF | USE_GLOBAL */
