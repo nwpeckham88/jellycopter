@@ -247,8 +247,20 @@ class DefaultMediaRepository(
                     val root = jsonParser.parseToJsonElement(responseBody).jsonObject
                     val items = root["Items"]?.jsonArray
                     if (items != null && items.isNotEmpty()) {
-                        val obj = items[0].jsonObject
-                        return@withContext parseEpisodeItem(obj, seriesId)
+                        val cleanSeriesId = seriesId.removePrefix("series:").trim()
+                        val matching = items.firstOrNull { element ->
+                            val obj = element.jsonObject
+                            val sId = (obj["SeriesId"]?.jsonPrimitive?.contentOrNull
+                                ?: obj["seriesId"]?.jsonPrimitive?.contentOrNull
+                                ?: "").removePrefix("series:").trim()
+                            sId.equals(cleanSeriesId, ignoreCase = true)
+                        }
+                        if (matching != null) {
+                            return@withContext parseEpisodeItem(matching.jsonObject, seriesId)
+                        }
+                        // Jellyfin returns global NextUp if seriesId is unknown or a movie.
+                        // Never return an episode belonging to a different show!
+                        return@withContext null
                     }
                 } catch (_: Exception) {
                     // Fall through

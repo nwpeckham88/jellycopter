@@ -677,7 +677,7 @@ fun RotaryChannelDial(
     selectedChannel: Int,
     onChannelSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    dialSize: Dp = 90.dp
+    dialSize: Dp = 58.dp
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
@@ -696,42 +696,29 @@ fun RotaryChannelDial(
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(8.dp))
             .border(
                 BorderStroke(
                     if (isFocused) 2.dp else 1.dp,
                     if (isFocused) JellycopterTheme.colors.borderGlow else Color(0x33C8A060)
                 ),
-                RoundedCornerShape(10.dp)
+                RoundedCornerShape(8.dp)
             )
             .background(Color(0xFF1E1710))
-            .padding(8.dp)
+            .padding(horizontal = 6.dp, vertical = 4.dp)
             .onFocusChanged { isFocused = it.isFocused }
-            .focusable(interactionSource = interactionSource)
             .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyUp) {
-                    when (keyEvent.key) {
-                        Key.DirectionRight, Key.DirectionDown -> {
+                when (keyEvent.key) {
+                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                        if (keyEvent.type == KeyEventType.KeyUp) {
                             val next = if (selectedChannel >= 13) 2 else selectedChannel + 1
                             RetroAudioEffects.playKnobClick()
                             onChannelSelected(next)
-                            true
                         }
-                        Key.DirectionLeft, Key.DirectionUp -> {
-                            val prev = if (selectedChannel <= 2) 13 else selectedChannel - 1
-                            RetroAudioEffects.playKnobClick()
-                            onChannelSelected(prev)
-                            true
-                        }
-                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                            val next = if (selectedChannel >= 13) 2 else selectedChannel + 1
-                            RetroAudioEffects.playKnobClick()
-                            onChannelSelected(next)
-                            true
-                        }
-                        else -> false
+                        true
                     }
-                } else false
+                    else -> false
+                }
             }
             .clickable(
                 interactionSource = interactionSource,
@@ -747,13 +734,13 @@ fun RotaryChannelDial(
         // Label Header
         Text(
             text = "VHF CHANNEL",
-            fontSize = 9.sp,
+            fontSize = 8.sp,
             fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 1.sp,
+            letterSpacing = 0.8.sp,
             color = Color(0xFFD4AF37) // Antique Brass
         )
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(2.dp))
 
         // Rotary Knob Face
         Box(
@@ -769,11 +756,11 @@ fun RotaryChannelDial(
                         )
                     )
                 )
-                .border(BorderStroke(2.dp, Color(0xFFD4AF37)), CircleShape),
+                .border(BorderStroke(1.5.dp, Color(0xFFD4AF37)), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             // Channel Numbers Dial Ring (Stationary plate with channels 2..13)
-            Canvas(modifier = Modifier.fillMaxSize().padding(6.dp)) {
+            Canvas(modifier = Modifier.fillMaxSize().padding(4.dp)) {
                 val radius = size.minDimension / 2f
                 val center = Offset(size.width / 2f, size.height / 2f)
 
@@ -788,7 +775,7 @@ fun RotaryChannelDial(
                     val isCur = ch == selectedChannel
                     drawCircle(
                         color = if (isCur) Color(0xFFFFB300) else Color(0x88C8A060),
-                        radius = if (isCur) 2.5f else 1.2f,
+                        radius = if (isCur) 2f else 1f,
                         center = Offset(x, y)
                     )
                 }
@@ -809,15 +796,15 @@ fun RotaryChannelDial(
                             )
                         )
                     )
-                    .border(BorderStroke(1.5.dp, Color(0xFFE5C07B)), CircleShape),
+                    .border(BorderStroke(1.2.dp, Color(0xFFE5C07B)), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 // Ribbed Flutes / Tactile Ridge Bar across the knob
                 Box(
                     modifier = Modifier
-                        .width(7.dp)
+                        .width(5.dp)
                         .height(dialSize * 0.55f)
-                        .clip(RoundedCornerShape(3.dp))
+                        .clip(RoundedCornerShape(2.dp))
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
@@ -834,10 +821,10 @@ fun RotaryChannelDial(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = 2.dp)
-                        .size(5.dp)
+                        .size(4.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFFFB300))
-                        .border(BorderStroke(0.8.dp, Color(0xFFB8860B)), CircleShape)
+                        .border(BorderStroke(0.6.dp, Color(0xFFB8860B)), CircleShape)
                 )
 
                 // Brass Center Cap
@@ -855,17 +842,18 @@ fun RotaryChannelDial(
                                 )
                             )
                         )
-                        .border(BorderStroke(1.dp, Color(0xFF6B4E23)), CircleShape)
+                        .border(BorderStroke(0.8.dp, Color(0xFF6B4E23)), CircleShape)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(2.dp))
 
         // Selected Channel Callout Pip
+        val chCallout = if (selectedChannel < 10) "CH 0$selectedChannel" else "CH $selectedChannel"
         Text(
-            text = "CH 0$selectedChannel",
-            fontSize = 11.sp,
+            text = chCallout,
+            fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
             color = if (isFocused) Color(0xFFFFD54F) else Color(0xFF34D399)
@@ -907,16 +895,16 @@ fun AnalogVuMeter(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .border(BorderStroke(1.5.dp, Color(0xFF8B6914)), RoundedCornerShape(8.dp))
+            .border(BorderStroke(1.2.dp, Color(0xFF8B6914)), RoundedCornerShape(8.dp))
             .background(Color(0xFF140E08))
-            .padding(6.dp),
+            .padding(horizontal = 6.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Meter Window Glass
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
+                .height(34.dp)
                 .clip(RoundedCornerShape(4.dp))
                 // Warm incandescent backlit meter glow
                 .background(
@@ -935,7 +923,7 @@ fun AnalogVuMeter(
                 val h = size.height
 
                 // Draw arc gauge ticks: -20, -10, -7, -5, -3, 0, +1, +2, +3
-                val pivot = Offset(w / 2f, h + 10f)
+                val pivot = Offset(w / 2f, h + 6f)
                 val meterLength = h * 1.15f
 
                 // Scale line
@@ -973,14 +961,14 @@ fun AnalogVuMeter(
                     color = Color(0xFF1A1A1A),
                     start = pivot,
                     end = tip,
-                    strokeWidth = 2.0f,
+                    strokeWidth = 1.8f,
                     cap = StrokeCap.Round
                 )
 
                 // Center pivot cap
                 drawCircle(
                     color = Color(0xFF332211),
-                    radius = 4.5f,
+                    radius = 3.5f,
                     center = pivot
                 )
             }
@@ -988,33 +976,33 @@ fun AnalogVuMeter(
             // Gauge labels
             Text(
                 text = "VU",
-                fontSize = 8.sp,
+                fontSize = 7.5.sp,
                 fontWeight = FontWeight.Black,
                 color = Color(0xFF332211),
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp)
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 1.dp)
             )
             Text(
                 text = "-20",
-                fontSize = 7.sp,
+                fontSize = 6.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF332211),
-                modifier = Modifier.align(Alignment.TopStart).padding(start = 6.dp, top = 4.dp)
+                modifier = Modifier.align(Alignment.TopStart).padding(start = 4.dp, top = 2.dp)
             )
             Text(
                 text = "+3dB",
-                fontSize = 7.sp,
+                fontSize = 6.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFD32F2F),
-                modifier = Modifier.align(Alignment.TopEnd).padding(end = 6.dp, top = 4.dp)
+                modifier = Modifier.align(Alignment.TopEnd).padding(end = 4.dp, top = 2.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(3.dp))
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = meterLabel,
-            fontSize = 8.sp,
+            fontSize = 7.5.sp,
             fontWeight = FontWeight.Bold,
-            letterSpacing = 0.8.sp,
+            letterSpacing = 0.6.sp,
             color = Color(0xFFC8A060)
         )
     }
@@ -1091,7 +1079,7 @@ fun TactilePushButton(
     var isFocused by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
 
-    val shape = RoundedCornerShape(6.dp)
+    val shape = RoundedCornerShape(5.dp)
 
     Box(
         modifier = modifier
@@ -1116,18 +1104,17 @@ fun TactilePushButton(
                 shape = shape
             )
             .onFocusChanged { isFocused = it.isFocused }
-            .focusable(interactionSource = interactionSource)
             .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyUp) {
-                    when (keyEvent.key) {
-                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                when (keyEvent.key) {
+                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                        if (keyEvent.type == KeyEventType.KeyUp) {
                             RetroAudioEffects.playKnobClick()
                             onClick()
-                            true
                         }
-                        else -> false
+                        true
                     }
-                } else false
+                    else -> false
+                }
             }
             .clickable(
                 interactionSource = interactionSource,
@@ -1137,7 +1124,7 @@ fun TactilePushButton(
                     onClick()
                 }
             )
-            .padding(horizontal = 10.dp, vertical = 7.dp),
+            .padding(horizontal = 8.dp, vertical = 4.5.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -1164,7 +1151,7 @@ fun TactilePushButton(
                 )
                 Text(
                     text = label,
-                    fontSize = 11.sp,
+                    fontSize = 10.5.sp,
                     fontWeight = if (isFocused || isSelected) FontWeight.ExtraBold else FontWeight.Bold,
                     color = when {
                         isFocused -> Color(0xFFFFFBEB)
@@ -1179,7 +1166,7 @@ fun TactilePushButton(
             if (badgeText != null) {
                 Text(
                     text = badgeText,
-                    fontSize = 9.sp,
+                    fontSize = 8.5.sp,
                     fontWeight = FontWeight.Black,
                     fontFamily = FontFamily.Monospace,
                     color = if (isSelected) Color(0xFF34D399) else Color(0x99C8A060)
@@ -1196,7 +1183,7 @@ fun TactilePushButton(
 @Composable
 fun SpeakerGrille(
     modifier: Modifier = Modifier,
-    slatCount: Int = 8,
+    slatCount: Int = 4,
     badgeText: String = "SOLID STATE STEREO"
 ) {
     Column(
@@ -1204,15 +1191,15 @@ fun SpeakerGrille(
             .clip(RoundedCornerShape(6.dp))
             .background(Color(0xFF140D07))
             .border(BorderStroke(1.dp, Color(0xFF3A2412)), RoundedCornerShape(6.dp))
-            .padding(8.dp),
+            .padding(horizontal = 6.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         for (i in 0 until slatCount) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(3.dp)
-                    .clip(RoundedCornerShape(1.5.dp))
+                    .height(2.5.dp)
+                    .clip(RoundedCornerShape(1.dp))
                     .background(
                         Brush.horizontalGradient(
                             colors = listOf(
@@ -1224,11 +1211,11 @@ fun SpeakerGrille(
                     )
             )
             if (i < slatCount - 1) {
-                Spacer(modifier = Modifier.height(3.dp))
+                Spacer(modifier = Modifier.height(2.5.dp))
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         // Brass Badge Nameplate
         Box(
@@ -1243,13 +1230,13 @@ fun SpeakerGrille(
                         )
                     )
                 )
-                .padding(horizontal = 8.dp, vertical = 2.dp)
+                .padding(horizontal = 6.dp, vertical = 1.5.dp)
         ) {
             Text(
                 text = badgeText,
-                fontSize = 7.5.sp,
+                fontSize = 7.sp,
                 fontWeight = FontWeight.Black,
-                letterSpacing = 1.sp,
+                letterSpacing = 0.8.sp,
                 color = Color(0xFF1A1208)
             )
         }

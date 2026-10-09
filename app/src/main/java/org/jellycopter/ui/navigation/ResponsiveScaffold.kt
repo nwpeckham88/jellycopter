@@ -56,12 +56,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import kotlinx.coroutines.delay
 import android.content.Context
@@ -205,6 +208,9 @@ private fun TvLeanbackLayout(
         }
     }
 
+    var isFocusInNavWing by remember { mutableStateOf(false) }
+    val guideFocusRequester = remember { FocusRequester() }
+
     fun changeChannel(newChannel: Int) {
         val normalized = when {
             newChannel < 2 -> 13
@@ -218,8 +224,23 @@ private fun TvLeanbackLayout(
         }
     }
 
+    // Android TV Leanback Back-button routing:
+    // 1. Browsing content on Home Channel 2 -> hop focus to tuner navigation wing
+    BackHandler(enabled = currentScreen == NavScreen.HOME && currentChannel == 2 && !isFocusInNavWing) {
+        guideFocusRequester.requestFocus()
+    }
+
+    // 2. Watching a broadcast channel on Home -> tune back to Channel 2 (Guide) and focus wing
     BackHandler(enabled = currentScreen == NavScreen.HOME && currentChannel != 2) {
         changeChannel(2)
+        guideFocusRequester.requestFocus()
+    }
+
+    // 3. Sub-screens (Library, Settings, Discover, Trophies) -> return to Home Channel 2 and focus wing
+    BackHandler(enabled = currentScreen != NavScreen.HOME) {
+        onScreenSelected(NavScreen.HOME)
+        changeChannel(2)
+        guideFocusRequester.requestFocus()
     }
 
     // Outer frame: 16:9 walnut woodgrain cabinet with brass pinstripe border
@@ -253,8 +274,7 @@ private fun TvLeanbackLayout(
                 shape = RoundedCornerShape(14.dp)
             )
             .padding(10.dp)
-            .focusable()
-            .onKeyEvent { keyEvent ->
+            .onPreviewKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     val keyCode = keyEvent.nativeKeyEvent.keyCode
                     when {
@@ -440,7 +460,8 @@ private fun TvLeanbackLayout(
                         )
                     )
                     .border(BorderStroke(1.5.dp, Color(0xFF8B6914)), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                    .onFocusChanged { isFocusInNavWing = it.hasFocus }
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
@@ -449,7 +470,7 @@ private fun TvLeanbackLayout(
                     selectedChannel = currentChannel,
                     onChannelSelected = { changeChannel(it) },
                     modifier = Modifier.fillMaxWidth(),
-                    dialSize = 78.dp
+                    dialSize = 58.dp
                 )
 
                 // Analog Backlit VU Meter + Glowing Green VFD Channel Display ('CH 02 GUIDE', etc.)
@@ -468,7 +489,7 @@ private fun TvLeanbackLayout(
                 // '[CH 2] GUIDE', '[LIBRARY]', '[DISCOVER]', '[TROPHIES]', '[SETTINGS]'
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     TactilePushButton(
                         label = "[CH 2] GUIDE",
@@ -477,30 +498,37 @@ private fun TvLeanbackLayout(
                             changeChannel(2)
                             onScreenSelected(NavScreen.HOME)
                         },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(guideFocusRequester),
                         badgeText = "02"
                     )
                     TactilePushButton(
                         label = "[LIBRARY]",
                         isSelected = currentScreen == NavScreen.LIBRARY,
                         onClick = { onScreenSelected(NavScreen.LIBRARY) },
+                        modifier = Modifier.fillMaxWidth(),
                         badgeText = "AUX"
                     )
                     TactilePushButton(
                         label = "[DISCOVER]",
                         isSelected = currentScreen == NavScreen.DISCOVER,
                         onClick = { onScreenSelected(NavScreen.DISCOVER) },
+                        modifier = Modifier.fillMaxWidth(),
                         badgeText = "AUX"
                     )
                     TactilePushButton(
                         label = "[TROPHIES]",
                         isSelected = currentScreen == NavScreen.TROPHY_ROOM,
                         onClick = { onScreenSelected(NavScreen.TROPHY_ROOM) },
+                        modifier = Modifier.fillMaxWidth(),
                         badgeText = "AUX"
                     )
                     TactilePushButton(
                         label = "[SETTINGS]",
                         isSelected = currentScreen == NavScreen.SETTINGS,
                         onClick = { onScreenSelected(NavScreen.SETTINGS) },
+                        modifier = Modifier.fillMaxWidth(),
                         badgeText = "AUX"
                     )
                 }
@@ -508,7 +536,7 @@ private fun TvLeanbackLayout(
                 // Speaker grille with brass 'SOLID STATE STEREO' badge
                 SpeakerGrille(
                     modifier = Modifier.fillMaxWidth(),
-                    slatCount = 6,
+                    slatCount = 4,
                     badgeText = "SOLID STATE STEREO"
                 )
             }

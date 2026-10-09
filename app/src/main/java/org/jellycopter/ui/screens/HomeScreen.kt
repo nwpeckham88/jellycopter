@@ -116,32 +116,34 @@ fun HomeScreen(
                     }.distinctBy { it.id }
 
                     if (allSeries.isNotEmpty()) {
-                        allSeries.take(10).map { series ->
+                        allSeries.mapNotNull { series ->
                             val nextUp = mediaRepository.getNextUpForSeries(series.id)
-                                ?: mediaRepository.getFirstEpisodeForSeries(series.id)
                             val deckProgress = deckRepository?.getProgress("series:${series.id}")
                             val resumeMs = deckProgress?.midwayResumeMs ?: 0L
-                            val duration = if ((nextUp?.runTimeTicks ?: 0L) > 0L) {
-                                nextUp!!.runTimeTicks / 10_000L
-                            } else if ((deckProgress?.durationMs ?: 0L) > 0L) {
-                                deckProgress!!.durationMs
-                            } else {
-                                2_700_000L
-                            }
 
-                            ContinueWatchingItem(
-                                id = series.id,
-                                seriesTitle = series.name,
-                                episodeTitle = nextUp?.name ?: "Episode 1",
-                                seasonNumber = nextUp?.seasonNumber ?: 1,
-                                episodeNumber = nextUp?.indexNumber ?: 1,
-                                resumePositionMs = resumeMs,
-                                durationMs = duration,
-                                overview = series.overview ?: nextUp?.overview,
-                                backdropUrl = series.backdropUrl ?: mediaRepository.buildBackdropImageUrl(series.id),
-                                posterUrl = series.posterUrl ?: mediaRepository.buildPrimaryImageUrl(series.id)
-                            )
-                        }
+                            if (nextUp != null || resumeMs > 0L) {
+                                val duration = if ((nextUp?.runTimeTicks ?: 0L) > 0L) {
+                                    (nextUp?.runTimeTicks ?: 0L) / 10_000L
+                                } else if ((deckProgress?.durationMs ?: 0L) > 0L) {
+                                    deckProgress?.durationMs ?: 2_700_000L
+                                } else {
+                                    2_700_000L
+                                }
+
+                                ContinueWatchingItem(
+                                    id = series.id,
+                                    seriesTitle = series.name,
+                                    episodeTitle = nextUp?.name ?: "In Progress",
+                                    seasonNumber = nextUp?.seasonNumber ?: 0,
+                                    episodeNumber = nextUp?.indexNumber ?: 0,
+                                    resumePositionMs = resumeMs,
+                                    durationMs = duration,
+                                    overview = nextUp?.overview ?: series.overview,
+                                    backdropUrl = series.backdropUrl ?: mediaRepository.buildBackdropImageUrl(series.id),
+                                    posterUrl = series.posterUrl ?: mediaRepository.buildPrimaryImageUrl(series.id)
+                                )
+                            } else null
+                        }.take(10)
                     } else {
                         emptyList()
                     }
@@ -216,7 +218,13 @@ fun HomeScreen(
 
     if (activeSpotlight != null) {
         heroTitle = activeSpotlight.seriesTitle
-        heroSubtitle = "S${activeSpotlight.seasonNumber}:E${activeSpotlight.episodeNumber} • ${activeSpotlight.episodeTitle}"
+        heroSubtitle = if (activeSpotlight.seasonNumber > 0 && activeSpotlight.episodeNumber > 0) {
+            "S${activeSpotlight.seasonNumber}:E${activeSpotlight.episodeNumber} • ${activeSpotlight.episodeTitle}"
+        } else if (activeSpotlight.episodeTitle.isNotBlank() && activeSpotlight.episodeTitle != "In Progress" && activeSpotlight.episodeTitle != activeSpotlight.seriesTitle) {
+            activeSpotlight.episodeTitle
+        } else {
+            "In Progress"
+        }
         heroDescription = activeSpotlight.overview
             ?: "Smart Shuffle continuously balances episode pacing, preventing character repetition while preserving canon arcs."
         heroBackdropUrl = activeSpotlight.backdropUrl ?: activeSpotlight.posterUrl
@@ -238,7 +246,13 @@ fun HomeScreen(
         isDeckItem = true
     } else if (firstContinueWatching != null) {
         heroTitle = firstContinueWatching.seriesTitle
-        heroSubtitle = "S${firstContinueWatching.seasonNumber}:E${firstContinueWatching.episodeNumber} • ${firstContinueWatching.episodeTitle}"
+        heroSubtitle = if (firstContinueWatching.seasonNumber > 0 && firstContinueWatching.episodeNumber > 0) {
+            "S${firstContinueWatching.seasonNumber}:E${firstContinueWatching.episodeNumber} • ${firstContinueWatching.episodeTitle}"
+        } else if (firstContinueWatching.episodeTitle.isNotBlank() && firstContinueWatching.episodeTitle != "In Progress" && firstContinueWatching.episodeTitle != firstContinueWatching.seriesTitle) {
+            firstContinueWatching.episodeTitle
+        } else {
+            "In Progress"
+        }
         heroDescription = firstContinueWatching.overview
             ?: "Smart Shuffle continuously balances episode pacing, preventing character repetition while preserving canon arcs."
         heroBackdropUrl = firstContinueWatching.backdropUrl ?: firstContinueWatching.posterUrl
@@ -270,7 +284,7 @@ fun HomeScreen(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
         contentPadding = PaddingValues(bottom = 36.dp)
     ) {
         // Hero Spotlight Banner (Apple TV / JellyWatch Cinematic Stage)
@@ -469,10 +483,10 @@ private fun HeroBanner(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(248.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .height(185.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(JellycopterTheme.colors.surface)
-            .border(BorderStroke(1.dp, Color(0x18FFFFFF)), RoundedCornerShape(14.dp))
+            .border(BorderStroke(1.dp, Color(0x18FFFFFF)), RoundedCornerShape(12.dp))
     ) {
         Crossfade(
             targetState = backdropUrl,
@@ -555,14 +569,14 @@ private fun HeroBanner(
 
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.72f)
+                .fillMaxWidth(0.92f)
                 .align(Alignment.CenterStart)
-                .padding(horizontal = 28.dp, vertical = 20.dp)
+                .padding(horizontal = 20.dp, vertical = 10.dp)
         ) {
             // Badges row
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 if (isRealMedia) {
                     MetadataChip(
@@ -589,11 +603,11 @@ private fun HeroBanner(
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(3.dp))
 
             Text(
                 text = title,
-                fontSize = 28.sp,
+                fontSize = 20.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.White,
                 letterSpacing = (-0.5).sp,
@@ -601,18 +615,18 @@ private fun HeroBanner(
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
             Text(
                 text = subtitle,
-                fontSize = 13.sp,
+                fontSize = 11.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = JellycopterTheme.colors.primaryAccent,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(3.dp))
 
             // Tech metadata chips row (only if real media)
             if (isRealMedia) {
@@ -625,25 +639,25 @@ private fun HeroBanner(
                     MetadataChip(text = "5.1 AUDIO")
                     MetadataChip(text = "TV-MA")
                 }
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(3.dp))
             }
 
             Text(
                 text = description,
-                fontSize = 12.5.sp,
+                fontSize = 11.5.sp,
                 color = Color(0xFFCBD5E1),
                 maxLines = 2,
-                lineHeight = 17.sp,
+                lineHeight = 15.sp,
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Action Buttons
             if (showResume || showShuffle || (seriesId != null)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (showResume) {
                         FocusCard(
@@ -651,13 +665,13 @@ private fun HeroBanner(
                             shape = RoundedCornerShape(8.dp)
                         ) { isFocused ->
                             val bgButton = if (isFocused) Color.White else JellycopterTheme.colors.primaryAccent
-                            val fgButton = if (isFocused) Color.Black else Color.White
+                            val fgButton = if (isFocused) Color.Black else Color(0xFF140D07)
 
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(bgButton)
-                                    .padding(horizontal = 18.dp, vertical = 9.dp),
+                                    .padding(horizontal = 14.dp, vertical = 7.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Row(
@@ -667,13 +681,13 @@ private fun HeroBanner(
                                     Icon(
                                         imageVector = Icons.Rounded.PlayArrow,
                                         contentDescription = "Resume Playback",
-                                        modifier = Modifier.size(18.dp),
+                                        modifier = Modifier.size(16.dp),
                                         tint = fgButton
                                     )
                                     Text(
                                         text = "Resume Playback",
                                         color = fgButton,
-                                        fontSize = 13.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -686,16 +700,16 @@ private fun HeroBanner(
                             onClick = onShuffleClick,
                             shape = RoundedCornerShape(8.dp)
                         ) { isFocused ->
-                            val bgButton = if (isFocused) Color.White else Color(0x22FFFFFF)
+                            val bgButton = if (isFocused) Color.White else Color(0x33FFFFFF)
                             val fgButton = if (isFocused) Color.Black else Color.White
-                            val borderCol = if (isFocused) Color.White else Color(0x35FFFFFF)
+                            val borderCol = if (isFocused) Color.White else Color(0x40FFFFFF)
 
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(bgButton)
                                     .border(BorderStroke(1.dp, borderCol), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 16.dp, vertical = 9.dp),
+                                    .padding(horizontal = 14.dp, vertical = 7.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Row(
@@ -705,13 +719,13 @@ private fun HeroBanner(
                                     Icon(
                                         imageVector = Icons.Rounded.Shuffle,
                                         contentDescription = "Smart Shuffle",
-                                        modifier = Modifier.size(18.dp),
+                                        modifier = Modifier.size(16.dp),
                                         tint = fgButton
                                     )
                                     Text(
                                         text = "Smart Shuffle",
                                         color = fgButton,
-                                        fontSize = 13.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                 }
@@ -724,32 +738,32 @@ private fun HeroBanner(
                             onClick = onDetailsClick,
                             shape = RoundedCornerShape(8.dp)
                         ) { isFocused ->
-                            val bgButton = if (isFocused) Color.White else Color(0x18FFFFFF)
-                            val fgButton = if (isFocused) Color.Black else Color(0xFFCBD5E1)
-                            val borderCol = if (isFocused) Color.White else Color(0x28FFFFFF)
+                            val bgButton = if (isFocused) Color.White else Color(0x22FFFFFF)
+                            val fgButton = if (isFocused) Color.Black else Color.White
+                            val borderCol = if (isFocused) Color.White else Color(0x30FFFFFF)
 
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(bgButton)
                                     .border(BorderStroke(1.dp, borderCol), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                                    .padding(horizontal = 12.dp, vertical = 7.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Rounded.Info,
                                         contentDescription = "Series Details",
-                                        modifier = Modifier.size(16.dp),
+                                        modifier = Modifier.size(15.dp),
                                         tint = fgButton
                                     )
                                     Text(
                                         text = "Details",
                                         color = fgButton,
-                                        fontSize = 13.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
@@ -1012,8 +1026,15 @@ private fun ContinueWatchingCard(
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(2.dp))
+            val epSubtitle = if (item.seasonNumber > 0 && item.episodeNumber > 0) {
+                "S${item.seasonNumber}:E${item.episodeNumber} • ${item.episodeTitle}"
+            } else if (item.episodeTitle.isNotBlank() && item.episodeTitle != "In Progress" && item.episodeTitle != item.seriesTitle) {
+                item.episodeTitle
+            } else {
+                "In Progress"
+            }
             Text(
-                text = "S${item.seasonNumber}:E${item.episodeNumber} • ${item.episodeTitle}",
+                text = epSubtitle,
                 fontSize = 12.sp,
                 color = Color(0xFF94A3B8),
                 maxLines = 1,
