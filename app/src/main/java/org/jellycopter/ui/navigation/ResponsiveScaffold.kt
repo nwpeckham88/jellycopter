@@ -64,8 +64,19 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import kotlinx.coroutines.delay
+import android.content.Context
+import android.view.KeyEvent
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import org.jellycopter.ui.components.AnalogVuMeter
+import org.jellycopter.ui.components.CrtScreenTube
 import org.jellycopter.ui.components.FocusCard
 import org.jellycopter.ui.components.JellycopterLogo
+import org.jellycopter.ui.components.RetroAudioEffects
+import org.jellycopter.ui.components.RotaryChannelDial
+import org.jellycopter.ui.components.SpeakerGrille
+import org.jellycopter.ui.components.TactilePushButton
+import org.jellycopter.ui.components.VfdChannelDisplay
 import org.jellycopter.ui.theme.JellycopterTheme
 
 /**
@@ -132,6 +143,12 @@ private fun TvLeanbackLayout(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
+    val prefs = remember(context) {
+        context.getSharedPreferences("jellycopter_settings", Context.MODE_PRIVATE)
+    }
+    val scanlinesEnabled = prefs.getBoolean("key_crt_scanlines", true)
+
     var currentTime by remember {
         mutableStateOf(
             try {
@@ -153,339 +170,398 @@ private fun TvLeanbackLayout(
         }
     }
 
-    var railHasFocus by remember { mutableStateOf(false) }
-    val railWidth by animateDpAsState(
-        targetValue = if (railHasFocus) 220.dp else 76.dp,
-        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
-        label = "railWidth"
-    )
+    // Map screen to channel number (2..13)
+    fun screenToChannel(screen: NavScreen): Int = when (screen) {
+        NavScreen.HOME -> 2
+        NavScreen.DISCOVER -> 3
+        NavScreen.CHANNELS -> 4
+        NavScreen.LIBRARY -> 5
+        NavScreen.TROPHY_ROOM -> 6
+        NavScreen.SETTINGS -> 7
+        NavScreen.POST_PLAYBACK -> 2
+    }
 
-    Row(
+    var currentChannel by remember { mutableStateOf(screenToChannel(currentScreen)) }
+
+    LaunchedEffect(currentScreen) {
+        val expected = screenToChannel(currentScreen)
+        if (currentChannel in 2..7 && currentChannel != expected) {
+            currentChannel = expected
+        }
+    }
+
+    fun changeChannel(newChannel: Int) {
+        val normalized = when {
+            newChannel < 2 -> 13
+            newChannel > 13 -> 2
+            else -> newChannel
+        }
+        RetroAudioEffects.playKnobClick()
+        currentChannel = normalized
+        when (normalized) {
+            2 -> onScreenSelected(NavScreen.HOME)
+            3 -> onScreenSelected(NavScreen.DISCOVER)
+            4 -> onScreenSelected(NavScreen.CHANNELS)
+            5 -> onScreenSelected(NavScreen.LIBRARY)
+            6 -> onScreenSelected(NavScreen.TROPHY_ROOM)
+            7 -> onScreenSelected(NavScreen.SETTINGS)
+            else -> {
+                // Channels 8..13 are off-air broadcast channels
+            }
+        }
+    }
+
+    fun getChannelLabel(channel: Int): String = when (channel) {
+        2 -> "GUIDE"
+        3 -> "DISCOVER"
+        4 -> "CHANNELS"
+        5 -> "LIBRARY"
+        6 -> "TROPHIES"
+        7 -> "SETTINGS"
+        8 -> "UHF 08"
+        9 -> "BROADCAST 09"
+        10 -> "RETRO RELAY"
+        11 -> "TEST PATTERN"
+        12 -> "COLOR BARS"
+        13 -> "SIGN-OFF"
+        else -> "CHANNEL $channel"
+    }
+
+    // Outer frame: 16:9 walnut woodgrain cabinet with brass pinstripe border
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .background(JellycopterTheme.colors.background)
-    ) {
-        // Vertical Frosted Left Navigation Rail (Expandable on remote focus)
-        Column(
-            modifier = Modifier
-                .width(railWidth)
-                .fillMaxHeight()
-                .background(JellycopterTheme.colors.surface.copy(alpha = 0.96f))
-                .border(BorderStroke(1.dp, Color(0x14FFFFFF)))
-                .onFocusChanged { railHasFocus = it.hasFocus }
-                .padding(vertical = 18.dp, horizontal = 10.dp),
-            horizontalAlignment = Alignment.Start
-        ) {
-            // Brand emblem at top (anchored horizontally so it never jumps on expand/collapse)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier.size(48.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0x16FFFFFF))
-                            .border(
-                                BorderStroke(1.dp, Color(0x24FFFFFF)),
-                                RoundedCornerShape(10.dp)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        JellycopterLogo(
-                            modifier = Modifier.size(22.dp),
-                            tint = JellycopterTheme.colors.primaryAccent
-                        )
-                    }
-                }
-
-                if (railWidth > 120.dp) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column(
-                        modifier = Modifier.padding(end = 6.dp)
-                    ) {
-                        Text(
-                            text = "JELLYCOPTER",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.2.sp,
-                            color = JellycopterTheme.colors.onBackground,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "Media Lounge",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            letterSpacing = 0.4.sp,
-                            color = JellycopterTheme.colors.onSurface.copy(alpha = 0.6f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Search action item
-            TvRailItem(
-                icon = Icons.Rounded.Search,
-                label = "Search",
-                isSelected = false,
-                railExpanded = railWidth > 120.dp,
-                onClick = { onScreenSelected(NavScreen.LIBRARY) }
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Navigation Screen Items
-            NavScreen.topLevelScreens(isDiscoverEnabled).forEach { screen ->
-                TvRailItem(
-                    icon = screen.icon,
-                    label = screen.title,
-                    isSelected = screen == currentScreen,
-                    railExpanded = railWidth > 120.dp,
-                    onClick = { onScreenSelected(screen) }
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFF22150D), // Walnut cabinet woodgrain
+                        Color(0xFF160E08),
+                        Color(0xFF28180E),
+                        Color(0xFF19100A),
+                        Color(0xFF24160D),
+                        Color(0xFF140D07)
+                    )
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+            )
+            .border(
+                BorderStroke(
+                    width = 3.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFFE5C07B), // Antique brass
+                            Color(0xFFB8860B),
+                            Color(0xFFD4AF37),
+                            Color(0xFF8B6914)
+                        )
+                    )
+                ),
+                shape = RoundedCornerShape(14.dp)
+            )
+            .padding(10.dp)
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    val keyCode = keyEvent.nativeKeyEvent.keyCode
+                    when {
+                        keyEvent.key == Key.ChannelUp || keyCode == KeyEvent.KEYCODE_CHANNEL_UP ||
+                        keyEvent.key == Key.PageUp || keyCode == KeyEvent.KEYCODE_PAGE_UP -> {
+                            val next = if (currentChannel >= 13) 2 else currentChannel + 1
+                            changeChannel(next)
+                            true
+                        }
+                        keyEvent.key == Key.ChannelDown || keyCode == KeyEvent.KEYCODE_CHANNEL_DOWN ||
+                        keyEvent.key == Key.PageDown || keyCode == KeyEvent.KEYCODE_PAGE_DOWN -> {
+                            val prev = if (currentChannel <= 2) 13 else currentChannel - 1
+                            changeChannel(prev)
+                            true
+                        }
+                        keyEvent.key == Key.Two || keyEvent.key == Key.NumPad2 || keyCode == KeyEvent.KEYCODE_2 || keyCode == KeyEvent.KEYCODE_NUMPAD_2 -> {
+                            changeChannel(2)
+                            true
+                        }
+                        keyEvent.key == Key.Three || keyEvent.key == Key.NumPad3 || keyCode == KeyEvent.KEYCODE_3 || keyCode == KeyEvent.KEYCODE_NUMPAD_3 -> {
+                            changeChannel(3)
+                            true
+                        }
+                        keyEvent.key == Key.Four || keyEvent.key == Key.NumPad4 || keyCode == KeyEvent.KEYCODE_4 || keyCode == KeyEvent.KEYCODE_NUMPAD_4 -> {
+                            changeChannel(4)
+                            true
+                        }
+                        keyEvent.key == Key.Five || keyEvent.key == Key.NumPad5 || keyCode == KeyEvent.KEYCODE_5 || keyCode == KeyEvent.KEYCODE_NUMPAD_5 -> {
+                            changeChannel(5)
+                            true
+                        }
+                        keyEvent.key == Key.Six || keyEvent.key == Key.NumPad6 || keyCode == KeyEvent.KEYCODE_6 || keyCode == KeyEvent.KEYCODE_NUMPAD_6 -> {
+                            changeChannel(6)
+                            true
+                        }
+                        keyEvent.key == Key.Seven || keyEvent.key == Key.NumPad7 || keyCode == KeyEvent.KEYCODE_7 || keyCode == KeyEvent.KEYCODE_NUMPAD_7 -> {
+                            changeChannel(7)
+                            true
+                        }
+                        keyEvent.key == Key.Eight || keyEvent.key == Key.NumPad8 || keyCode == KeyEvent.KEYCODE_8 || keyCode == KeyEvent.KEYCODE_NUMPAD_8 -> {
+                            changeChannel(8)
+                            true
+                        }
+                        keyEvent.key == Key.Nine || keyEvent.key == Key.NumPad9 || keyCode == KeyEvent.KEYCODE_9 || keyCode == KeyEvent.KEYCODE_NUMPAD_9 -> {
+                            changeChannel(9)
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
             }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // User profile avatar item
-            TvRailItem(
-                icon = Icons.Rounded.Person,
-                label = "User Profile",
-                subtitle = "Connected",
-                isSelected = false,
-                railExpanded = railWidth > 120.dp,
-                onClick = { onScreenSelected(NavScreen.SETTINGS) }
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Settings item
-            TvRailItem(
-                icon = Icons.Rounded.Settings,
-                label = "Settings",
-                isSelected = currentScreen == NavScreen.SETTINGS,
-                railExpanded = railWidth > 120.dp,
-                onClick = { onScreenSelected(NavScreen.SETTINGS) }
-            )
-        }
-
-        // Content Area with TV overscan margins and floating status header
-        Box(
+    ) {
+        // Inner cabinet chassis with brass pinstripe inlay
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
+                .fillMaxSize()
+                .border(BorderStroke(1.dp, Color(0x55D4AF37)), RoundedCornerShape(10.dp))
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Main Screen Content
+            // Center-Left (~72% width): The 4:3 CRT Picture Tube
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 28.dp, end = 36.dp, top = 20.dp, bottom = 20.dp)
+                    .weight(0.72f)
+                    .fillMaxHeight()
             ) {
-                content()
+                CrtScreenTube(
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 24.dp,
+                    scanlinesEnabled = scanlinesEnabled
+                ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Green/amber phosphor On-Screen Display (OSD) top bar
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color(0xCC050E08),
+                                            Color(0x66050E08),
+                                            Color.Transparent
+                                        )
+                                    )
+                                )
+                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text(
+                                    text = "CH ${if (currentChannel < 10) "0$currentChannel" else "$currentChannel"}",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF34D399) // Phosphor green
+                                )
+                                Text(
+                                    text = getChannelLabel(currentChannel),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF6EE7B7)
+                                )
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text(
+                                    text = "STEREO",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFFFFB300) // Amber phosphor glow
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(4.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF34D399))
+                                )
+                                Text(
+                                    text = currentTime,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF34D399)
+                                )
+                            }
+                        }
+
+                        // Content inside the CRT tube: Channel 2 is TV Guide / Home
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(start = 14.dp, end = 14.dp, bottom = 10.dp)
+                        ) {
+                            if (currentChannel <= 7) {
+                                content()
+                            } else {
+                                RetroOffAirScreen(channelNumber = currentChannel)
+                            }
+                        }
+                    }
+                }
             }
 
-            // Top-right floating frosted status capsule (Brand + Real-time Clock)
-            Row(
+            // Right Wing (~28% width): The Physical TV Hardware Control Wing
+            Column(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 20.dp, end = 36.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0x1AFFFFFF))
-                    .border(
-                        BorderStroke(1.dp, Color(0x22FFFFFF)),
-                        RoundedCornerShape(16.dp)
+                    .weight(0.28f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFF20150D), // Mahogany / brass trim panel
+                                Color(0xFF170E08),
+                                Color(0xFF120A05)
+                            )
+                        )
                     )
-                    .padding(horizontal = 14.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .border(BorderStroke(1.5.dp, Color(0xFF8B6914)), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                JellycopterLogo(
-                    modifier = Modifier.size(15.dp),
-                    tint = JellycopterTheme.colors.primaryAccent
+                // Rotary VHF Channel Dial (numbered 2..13, animated rotation on channel change)
+                RotaryChannelDial(
+                    selectedChannel = currentChannel,
+                    onChannelSelected = { changeChannel(it) },
+                    modifier = Modifier.fillMaxWidth(),
+                    dialSize = 78.dp
                 )
-                Text(
-                    text = "JELLYCOPTER",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 1.1.sp,
-                    color = Color.White
+
+                // Analog Backlit VU Meter + Glowing Green VFD Channel Display ('CH 02 GUIDE', etc.)
+                AnalogVuMeter(
+                    modifier = Modifier.fillMaxWidth(),
+                    meterLabel = "AUDIO MODULATION VU"
                 )
-                Box(
-                    modifier = Modifier
-                        .size(3.dp)
-                        .clip(CircleShape)
-                        .background(Color(0x55FFFFFF))
+
+                VfdChannelDisplay(
+                    channelNumber = currentChannel,
+                    channelName = getChannelLabel(currentChannel),
+                    modifier = Modifier.fillMaxWidth()
                 )
-                Text(
-                    text = currentTime,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.3.sp,
-                    color = Color(0xFFCBD5E1)
+
+                // Mechanical Push Buttons for shortcuts:
+                // '[CH 2] GUIDE', '[LIBRARY]', '[DISCOVER]', '[TROPHIES]', '[SETTINGS]'
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    TactilePushButton(
+                        label = "[CH 2] GUIDE",
+                        isSelected = currentScreen == NavScreen.HOME,
+                        onClick = { changeChannel(2) },
+                        badgeText = "02"
+                    )
+                    TactilePushButton(
+                        label = "[LIBRARY]",
+                        isSelected = currentScreen == NavScreen.LIBRARY,
+                        onClick = { changeChannel(5) },
+                        badgeText = "05"
+                    )
+                    TactilePushButton(
+                        label = "[DISCOVER]",
+                        isSelected = currentScreen == NavScreen.DISCOVER,
+                        onClick = { changeChannel(3) },
+                        badgeText = "03"
+                    )
+                    TactilePushButton(
+                        label = "[TROPHIES]",
+                        isSelected = currentScreen == NavScreen.TROPHY_ROOM,
+                        onClick = { changeChannel(6) },
+                        badgeText = "06"
+                    )
+                    TactilePushButton(
+                        label = "[SETTINGS]",
+                        isSelected = currentScreen == NavScreen.SETTINGS,
+                        onClick = { changeChannel(7) },
+                        badgeText = "07"
+                    )
+                }
+
+                // Speaker grille with brass 'SOLID STATE STEREO' badge
+                SpeakerGrille(
+                    modifier = Modifier.fillMaxWidth(),
+                    slatCount = 6,
+                    badgeText = "SOLID STATE STEREO"
                 )
             }
         }
     }
 }
 
-/**
- * Modern TV Navigation Rail Item:
- * - Borderless & backgroundless when idle/unfocused
- * - High-contrast crisp focus pill with clean focus border and smooth scale
- * - Sleek vertical accent indicator for active route
- * - Rock-solid stationary icon position during rail expansion/collapse
- */
 @Composable
-private fun TvRailItem(
-    icon: ImageVector,
-    label: String,
-    isSelected: Boolean,
-    railExpanded: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    subtitle: String? = null
-) {
-    var isFocused by remember { mutableStateOf(false) }
-    val interactionSource = remember { MutableInteractionSource() }
-
-    val shape = RoundedCornerShape(10.dp)
-
-    val iconScale by animateFloatAsState(
-        targetValue = if (isFocused) 1.10f else 1.0f,
-        animationSpec = tween(150),
-        label = "railIconScale"
-    )
-
-    Box(
+private fun RetroOffAirScreen(channelNumber: Int, modifier: Modifier = Modifier) {
+    Column(
         modifier = modifier
-            .fillMaxWidth()
-            .height(44.dp)
-            .clip(shape)
-            .background(
-                brush = when {
-                    isFocused -> SolidColor(Color(0x2AFFFFFF))
-                    isSelected -> SolidColor(JellycopterTheme.colors.primaryAccent.copy(alpha = 0.14f))
-                    else -> SolidColor(Color.Transparent)
-                },
-                shape = shape
-            )
-            .border(
-                BorderStroke(
-                    width = if (isFocused) 1.5.dp else if (isSelected) 1.dp else 0.dp,
-                    color = when {
-                        isFocused -> Color.White
-                        isSelected -> JellycopterTheme.colors.primaryAccent.copy(alpha = 0.30f)
-                        else -> Color.Transparent
-                    }
-                ),
-                shape = shape
-            )
-            .onFocusChanged { isFocused = it.isFocused }
-            .focusable(interactionSource = interactionSource)
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyUp) {
-                    when (keyEvent.key) {
-                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                            onClick()
-                            true
-                        }
-                        else -> false
-                    }
-                } else {
-                    false
-                }
-            }
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            )
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        // Active route vertical pill indicator on left edge
-        if (isSelected) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 3.dp)
-                    .width(3.dp)
-                    .height(18.dp)
-                    .clip(RoundedCornerShape(1.5.dp))
-                    .background(if (isFocused) Color.White else JellycopterTheme.colors.primaryAccent)
-            )
-        }
-
         Row(
-            modifier = Modifier.fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .height(130.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .border(BorderStroke(2.dp, Color(0xFF3E2818)), RoundedCornerShape(8.dp))
         ) {
-            // Stationary icon slot (anchored at start, width 48dp, center 24dp)
-            Box(
-                modifier = Modifier
-                    .padding(start = 4.dp)
-                    .size(48.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                val tint = when {
-                    isFocused -> Color.White
-                    isSelected -> JellycopterTheme.colors.primaryAccent
-                    else -> Color(0xFF94A3B8)
-                }
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    modifier = Modifier
-                        .size(24.dp)
-                        .scale(iconScale),
-                    tint = tint
-                )
-            }
-
-            if (railExpanded) {
-                Spacer(modifier = Modifier.width(6.dp))
-                Column(
+            val bars = listOf(
+                Color(0xFFE5E5E5),
+                Color(0xFFC0C000),
+                Color(0xFF00C0C0),
+                Color(0xFF00C000),
+                Color(0xFFC000C0),
+                Color(0xFFC000C0),
+                Color(0xFF0000C0)
+            )
+            bars.forEach { c ->
+                Box(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 10.dp),
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = label,
-                        fontSize = 13.5.sp,
-                        fontWeight = if (isFocused || isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = when {
-                            isFocused -> Color.White
-                            isSelected -> JellycopterTheme.colors.primaryAccent
-                            else -> Color(0xFFE2E8F0)
-                        },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (subtitle != null) {
-                        Text(
-                            text = subtitle,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Normal,
-                            color = if (isFocused) Color.White.copy(alpha = 0.8f) else Color(0xFF10B981),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
+                        .fillMaxHeight()
+                        .background(c)
+                )
             }
         }
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        Text(
+            text = "BROADCAST CH ${if (channelNumber < 10) "0$channelNumber" else "$channelNumber"}",
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Black,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 2.sp,
+            color = Color(0xFFFFB300)
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "OFF-AIR • PLEASE STAND BY",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            color = Color(0xFF34D399)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Tune rotary dial or press [CH 2] for TV Guide",
+            fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace,
+            color = Color(0xFF94A3B8)
+        )
     }
 }
 

@@ -13,6 +13,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 enum class BaseThemeMode {
+    WOODGRAIN_CONSOLE_1978,
     WARM_DARK,
     JELLYFIN_PURPLE,
     OLED_PURE_BLACK,
@@ -32,10 +33,22 @@ data class JellycopterColors(
 )
 
 val LocalJellycopterColors = staticCompositionLocalOf {
-    JellycopterThemeDefaults.warmDarkColors
+    JellycopterThemeDefaults.woodgrainConsoleColors
 }
 
 object JellycopterThemeDefaults {
+    val woodgrainConsoleColors = JellycopterColors(
+        background = Color(0xFF160E08),
+        surface = Color(0xFF0C0E11),
+        surfaceVariant = Color(0xFF26190E),
+        primaryAccent = Color(0xFFFFB300),
+        secondaryAccent = Color(0xFF34D399),
+        onBackground = Color(0xFFFFFBEB),
+        onSurface = Color(0xFFFEF3C7),
+        ambientGlow = Color(0x22FFB300),
+        borderGlow = Color(0xFFFFD54F)
+    )
+
     val warmDarkColors = JellycopterColors(
         background = Color(0xFF0C0E14),
         surface = Color(0xFF141824),
@@ -86,6 +99,7 @@ object JellycopterThemeDefaults {
 
     fun getBaseColors(mode: BaseThemeMode): JellycopterColors {
         return when (mode) {
+            BaseThemeMode.WOODGRAIN_CONSOLE_1978 -> woodgrainConsoleColors
             BaseThemeMode.WARM_DARK -> warmDarkColors
             BaseThemeMode.OLED_PURE_BLACK -> oledPureBlackColors
             BaseThemeMode.JELLYFIN_PURPLE -> jellyfinPurpleColors
