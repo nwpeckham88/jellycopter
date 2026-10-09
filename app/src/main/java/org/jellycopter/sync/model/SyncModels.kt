@@ -6,7 +6,9 @@ import kotlinx.serialization.Serializable
 data class PingResponseDto(
     val version: String = "1.0.0",
     val supportedSyncProtocols: List<Int> = listOf(1),
-    val serverTimeUtc: String? = null
+    val serverTimeUtc: String? = null,
+    val serverAudioDrcActive: Boolean = false,
+    val downmixAlgorithm: String? = null
 )
 
 @Serializable

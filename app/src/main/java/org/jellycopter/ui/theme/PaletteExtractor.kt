@@ -6,6 +6,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.palette.graphics.Palette
 import kotlin.math.roundToInt
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
 /**
  * Extracted color swatches from poster artwork.
  */
@@ -21,11 +24,39 @@ data class ExtractedPalette(
  *
  * Efficiently downsamples poster images to 120x180 px thumbnails for
  * rapid (<15ms) dominant and vibrant color extraction.
+ * Offloads heavy extraction to [Dispatchers.Default] and caches swatches
+ * in an in-memory LRU cache to prevent UI thread jank.
  */
 object PaletteExtractor {
 
     const val TARGET_WIDTH = 120
     const val TARGET_HEIGHT = 180
+    private const val DEFAULT_CACHE_MAX_SIZE = 64
+
+    /**
+     * In-memory LRU cache for extracted color palettes.
+     */
+    class PaletteMemoryLruCache(private val maxSize: Int = DEFAULT_CACHE_MAX_SIZE) {
+        private val map = object : LinkedHashMap<Int, ExtractedPalette>(maxSize, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, ExtractedPalette>?): Boolean {
+                return size > maxSize
+            }
+        }
+
+        @Synchronized
+        fun get(key: Int): ExtractedPalette? = map[key]
+
+        @Synchronized
+        fun put(key: Int, value: ExtractedPalette): ExtractedPalette? = map.put(key, value)
+
+        @Synchronized
+        fun clear() = map.clear()
+
+        @Synchronized
+        fun size(): Int = map.size
+    }
+
+    val cache = PaletteMemoryLruCache()
 
     /**
      * Calculates optimal downsampled dimensions preserving aspect ratio within 120x180.
@@ -46,10 +77,21 @@ object PaletteExtractor {
     }
 
     /**
-     * Extracts an ExtractedPalette from an Android Bitmap.
+     * Asynchronously extracts an [ExtractedPalette] from an Android [Bitmap] on [Dispatchers.Default],
+     * utilizing an in-memory LRU cache to prevent UI thread frame drops.
+     */
+    suspend fun extractFromBitmap(bitmap: Bitmap): ExtractedPalette = withContext(Dispatchers.Default) {
+        extractFromBitmapSync(bitmap)
+    }
+
+    /**
+     * Extracts an ExtractedPalette from an Android Bitmap synchronously with LRU caching.
      * Downsamples to 120x180 px before running AndroidX Palette generation.
      */
-    fun extractFromBitmap(bitmap: Bitmap): ExtractedPalette {
+    fun extractFromBitmapSync(bitmap: Bitmap): ExtractedPalette {
+        val cacheKey = bitmap.hashCode()
+        cache.get(cacheKey)?.let { return it }
+
         val (dstW, dstH) = downsampleDimensions(bitmap.width, bitmap.height)
         val scaled = if (bitmap.width != dstW || bitmap.height != dstH) {
             Bitmap.createScaledBitmap(bitmap, dstW, dstH, true)
@@ -66,20 +108,33 @@ object PaletteExtractor {
         val darkVibrant = palette.darkVibrantSwatch?.rgb?.let { Color(it) } ?: Color(0xFF0F172A)
         val lightVibrant = palette.lightVibrantSwatch?.rgb?.let { Color(it) } ?: Color(0xFF7DD3FC)
 
-        return ExtractedPalette(
+        val result = ExtractedPalette(
             dominantColor = dominant,
             vibrantColor = vibrant,
             darkVibrantColor = darkVibrant,
             lightVibrantColor = lightVibrant
         )
+        cache.put(cacheKey, result)
+        return result
     }
 
     /**
+     * Asynchronously extracts palette from raw pixels on [Dispatchers.Default] with LRU caching.
+     */
+    suspend fun extractFromPixelsAsync(pixels: IntArray, width: Int, height: Int): ExtractedPalette =
+        withContext(Dispatchers.Default) {
+            extractFromPixels(pixels, width, height)
+        }
+
+    /**
      * Algorithmic pixel-based palette extraction that runs cleanly without Android framework runtime.
-     * Computes dominant color, highest saturation vibrant color, and dark vibrant color.
+     * Computes dominant color, highest saturation vibrant color, and dark vibrant color with LRU caching.
      */
     fun extractFromPixels(pixels: IntArray, width: Int, height: Int): ExtractedPalette {
         if (pixels.isEmpty()) return ExtractedPalette()
+
+        val cacheKey = pixels.contentHashCode() xor (width * 31 + height)
+        cache.get(cacheKey)?.let { return it }
 
         val colorFrequency = mutableMapOf<Int, Int>()
         val bucketRepresentative = mutableMapOf<Int, Int>()
@@ -127,12 +182,14 @@ object PaletteExtractor {
         val dominantQuantized = colorFrequency.maxByOrNull { it.value }?.key
         val dominantInt = dominantQuantized?.let { bucketRepresentative[it] } ?: pixels[0]
 
-        return ExtractedPalette(
+        val result = ExtractedPalette(
             dominantColor = Color(dominantInt or 0xFF000000.toInt()),
             vibrantColor = Color(bestVibrant or 0xFF000000.toInt()),
             darkVibrantColor = Color(bestDarkVibrant or 0xFF000000.toInt()),
             lightVibrantColor = Color(bestVibrant or 0xFF000000.toInt())
         )
+        cache.put(cacheKey, result)
+        return result
     }
 
     /**

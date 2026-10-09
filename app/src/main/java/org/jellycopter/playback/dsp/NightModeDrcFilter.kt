@@ -42,11 +42,16 @@ class NightModeDrcFilter(
     private var outputBuffer: ByteBuffer = AudioProcessor.EMPTY_BUFFER
     private var inputEnded: Boolean = false
 
-    // Envelope state per channel (supports up to 8 channels)
+    // Envelope and gain state per channel (supports up to 8 channels)
     private var envelope: FloatArray = FloatArray(8)
+    private var currentGain: FloatArray = FloatArray(8) { 1.0f }
     private var alphaAttack: Float = 0.0f
     private var alphaRelease: Float = 0.0f
     private var ceilingLinear: Float = 0.70794578f // 10^(-3.0 / 20.0)
+
+    // Reusable scratch buffers for zero-allocation audio processing loop
+    private val floatScratch = FloatArray(BLOCK_SIZE * 8)
+    private val shortScratch = ShortArray(BLOCK_SIZE * 8)
 
     init {
         recalculateParameters()
@@ -70,6 +75,7 @@ class NightModeDrcFilter(
 
         if (envelope.size < inputAudioFormat.channelCount) {
             envelope = FloatArray(inputAudioFormat.channelCount)
+            currentGain = FloatArray(inputAudioFormat.channelCount) { 1.0f }
         }
 
         recalculateParameters()
@@ -122,24 +128,40 @@ class NightModeDrcFilter(
         val srcFloat = src.asFloatBuffer()
         val dstFloat = dst.asFloatBuffer()
 
-        for (i in 0 until frameCount) {
+        var frameOffset = 0
+        while (frameOffset < frameCount) {
+            val blockSize = min(BLOCK_SIZE, frameCount - frameOffset)
+            val sampleCount = blockSize * channels
+            srcFloat.get(floatScratch, 0, sampleCount)
+
             for (ch in 0 until channels) {
-                val sample = srcFloat.get()
-                val absSample = kotlin.math.abs(sample)
-
-                // Dual-envelope tracking
-                val env = if (absSample > envelope[ch]) {
-                    alphaAttack * envelope[ch] + (1.0f - alphaAttack) * absSample
-                } else {
-                    alphaRelease * envelope[ch] + (1.0f - alphaRelease) * absSample
+                // Update envelope across block for this channel
+                for (k in 0 until blockSize) {
+                    val s = floatScratch[k * channels + ch]
+                    val absSample = kotlin.math.abs(s)
+                    envelope[ch] = if (absSample > envelope[ch]) {
+                        alphaAttack * envelope[ch] + (1.0f - alphaAttack) * absSample
+                    } else {
+                        alphaRelease * envelope[ch] + (1.0f - alphaRelease) * absSample
+                    }
                 }
-                envelope[ch] = env
 
-                val gainDb = computeGainDb(levelToDbfs(env), config)
-                val linearGain = 10.0.pow(gainDb / 20.0).toFloat()
-                val processed = sample * linearGain
-                dstFloat.put(processed.coerceIn(-ceilingLinear, ceilingLinear))
+                val targetGain = 10.0.pow(computeGainDb(levelToDbfs(envelope[ch]), config) / 20.0).toFloat()
+                val startGain = currentGain[ch]
+                val gainStep = (targetGain - startGain) / blockSize
+                var g = startGain
+
+                for (k in 0 until blockSize) {
+                    g += gainStep
+                    val idx = k * channels + ch
+                    val processed = floatScratch[idx] * g
+                    floatScratch[idx] = processed.coerceIn(-ceilingLinear, ceilingLinear)
+                }
+                currentGain[ch] = targetGain
             }
+
+            dstFloat.put(floatScratch, 0, sampleCount)
+            frameOffset += blockSize
         }
 
         src.position(src.position() + frameCount * channels * 4)
@@ -156,26 +178,42 @@ class NightModeDrcFilter(
         val dstShort = dst.asShortBuffer()
         val ceiling16Bit = (ceilingLinear * 32767.0f).coerceIn(0.0f, 32767.0f)
 
-        for (i in 0 until frameCount) {
+        var frameOffset = 0
+        while (frameOffset < frameCount) {
+            val blockSize = min(BLOCK_SIZE, frameCount - frameOffset)
+            val sampleCount = blockSize * channels
+            srcShort.get(shortScratch, 0, sampleCount)
+
             for (ch in 0 until channels) {
-                val raw = srcShort.get()
-                val sample = raw / 32768.0f
-                val absSample = kotlin.math.abs(sample)
-
-                val env = if (absSample > envelope[ch]) {
-                    alphaAttack * envelope[ch] + (1.0f - alphaAttack) * absSample
-                } else {
-                    alphaRelease * envelope[ch] + (1.0f - alphaRelease) * absSample
+                for (k in 0 until blockSize) {
+                    val raw = shortScratch[k * channels + ch]
+                    val sample = raw / 32768.0f
+                    val absSample = kotlin.math.abs(sample)
+                    envelope[ch] = if (absSample > envelope[ch]) {
+                        alphaAttack * envelope[ch] + (1.0f - alphaAttack) * absSample
+                    } else {
+                        alphaRelease * envelope[ch] + (1.0f - alphaRelease) * absSample
+                    }
                 }
-                envelope[ch] = env
 
-                val gainDb = computeGainDb(levelToDbfs(env), config)
-                val linearGain = 10.0.pow(gainDb / 20.0).toFloat()
-                val processed = sample * linearGain
-                val clamped = processed.coerceIn(-ceilingLinear, ceilingLinear)
-                val outShort = (clamped * 32767.0f).coerceIn(-ceiling16Bit, ceiling16Bit).toInt().toShort()
-                dstShort.put(outShort)
+                val targetGain = 10.0.pow(computeGainDb(levelToDbfs(envelope[ch]), config) / 20.0).toFloat()
+                val startGain = currentGain[ch]
+                val gainStep = (targetGain - startGain) / blockSize
+                var g = startGain
+
+                for (k in 0 until blockSize) {
+                    g += gainStep
+                    val idx = k * channels + ch
+                    val sample = shortScratch[idx] / 32768.0f
+                    val processed = sample * g
+                    val clamped = processed.coerceIn(-ceilingLinear, ceilingLinear)
+                    shortScratch[idx] = (clamped * 32767.0f).coerceIn(-ceiling16Bit, ceiling16Bit).toInt().toShort()
+                }
+                currentGain[ch] = targetGain
             }
+
+            dstShort.put(shortScratch, 0, sampleCount)
+            frameOffset += blockSize
         }
 
         src.position(src.position() + frameCount * channels * 2)
@@ -198,6 +236,7 @@ class NightModeDrcFilter(
         outputBuffer = AudioProcessor.EMPTY_BUFFER
         inputEnded = false
         envelope.fill(0.0f)
+        currentGain.fill(1.0f)
     }
 
     override fun reset() {
@@ -208,6 +247,7 @@ class NightModeDrcFilter(
     }
 
     companion object {
+        const val BLOCK_SIZE = 32
         private const val SILENCE_FLOOR_DBFS = -120.0f
         private const val EPSILON = 1e-6f
 
@@ -252,7 +292,7 @@ class NightModeDrcFilter(
         }
 
         /**
-         * Standalone array processor for Float audio buffers.
+         * Standalone array processor for Float audio buffers using block-based gain interpolation.
          */
         fun processFloatBuffer(
             input: FloatArray,
@@ -264,6 +304,7 @@ class NightModeDrcFilter(
 
             val output = FloatArray(input.size)
             val envelope = FloatArray(channels)
+            val currentGain = FloatArray(channels) { 1.0f }
             val attackSec = max(0.001f, config.attackTimeMs / 1000.0f)
             val releaseSec = max(0.010f, config.releaseTimeMs / 1000.0f)
             val alphaAtt = exp(-1.0f / (attackSec * sampleRate))
@@ -271,30 +312,42 @@ class NightModeDrcFilter(
             val ceilingLinear = 10.0.pow(config.transientClampingCeilingDb / 20.0).toFloat()
 
             val frameCount = input.size / channels
-            for (i in 0 until frameCount) {
+            var frameOffset = 0
+            while (frameOffset < frameCount) {
+                val blockSize = min(BLOCK_SIZE, frameCount - frameOffset)
+
                 for (ch in 0 until channels) {
-                    val idx = i * channels + ch
-                    val sample = input[idx]
-                    val absSample = kotlin.math.abs(sample)
-
-                    val env = if (absSample > envelope[ch]) {
-                        alphaAtt * envelope[ch] + (1.0f - alphaAtt) * absSample
-                    } else {
-                        alphaRel * envelope[ch] + (1.0f - alphaRel) * absSample
+                    for (k in 0 until blockSize) {
+                        val idx = (frameOffset + k) * channels + ch
+                        val sample = input[idx]
+                        val absSample = kotlin.math.abs(sample)
+                        envelope[ch] = if (absSample > envelope[ch]) {
+                            alphaAtt * envelope[ch] + (1.0f - alphaAtt) * absSample
+                        } else {
+                            alphaRel * envelope[ch] + (1.0f - alphaRel) * absSample
+                        }
                     }
-                    envelope[ch] = env
 
-                    val gainDb = computeGainDb(levelToDbfs(env), config)
-                    val linearGain = 10.0.pow(gainDb / 20.0).toFloat()
-                    val processed = sample * linearGain
-                    output[idx] = processed.coerceIn(-ceilingLinear, ceilingLinear)
+                    val targetGain = 10.0.pow(computeGainDb(levelToDbfs(envelope[ch]), config) / 20.0).toFloat()
+                    val startGain = currentGain[ch]
+                    val gainStep = (targetGain - startGain) / blockSize
+                    var g = startGain
+
+                    for (k in 0 until blockSize) {
+                        g += gainStep
+                        val idx = (frameOffset + k) * channels + ch
+                        val processed = input[idx] * g
+                        output[idx] = processed.coerceIn(-ceilingLinear, ceilingLinear)
+                    }
+                    currentGain[ch] = targetGain
                 }
+                frameOffset += blockSize
             }
             return output
         }
 
         /**
-         * Standalone array processor for 16-bit PCM buffers.
+         * Standalone array processor for 16-bit PCM buffers using block-based gain interpolation.
          */
         fun process16BitBuffer(
             input: ShortArray,
@@ -306,6 +359,7 @@ class NightModeDrcFilter(
 
             val output = ShortArray(input.size)
             val envelope = FloatArray(channels)
+            val currentGain = FloatArray(channels) { 1.0f }
             val attackSec = max(0.001f, config.attackTimeMs / 1000.0f)
             val releaseSec = max(0.010f, config.releaseTimeMs / 1000.0f)
             val alphaAtt = exp(-1.0f / (attackSec * sampleRate))
@@ -314,26 +368,39 @@ class NightModeDrcFilter(
             val ceiling16Bit = (ceilingLinear * 32767.0f).coerceIn(0.0f, 32767.0f)
 
             val frameCount = input.size / channels
-            for (i in 0 until frameCount) {
+            var frameOffset = 0
+            while (frameOffset < frameCount) {
+                val blockSize = min(BLOCK_SIZE, frameCount - frameOffset)
+
                 for (ch in 0 until channels) {
-                    val idx = i * channels + ch
-                    val raw = input[idx]
-                    val sample = raw / 32768.0f
-                    val absSample = kotlin.math.abs(sample)
-
-                    val env = if (absSample > envelope[ch]) {
-                        alphaAtt * envelope[ch] + (1.0f - alphaAtt) * absSample
-                    } else {
-                        alphaRel * envelope[ch] + (1.0f - alphaRel) * absSample
+                    for (k in 0 until blockSize) {
+                        val idx = (frameOffset + k) * channels + ch
+                        val raw = input[idx]
+                        val sample = raw / 32768.0f
+                        val absSample = kotlin.math.abs(sample)
+                        envelope[ch] = if (absSample > envelope[ch]) {
+                            alphaAtt * envelope[ch] + (1.0f - alphaAtt) * absSample
+                        } else {
+                            alphaRel * envelope[ch] + (1.0f - alphaRel) * absSample
+                        }
                     }
-                    envelope[ch] = env
 
-                    val gainDb = computeGainDb(levelToDbfs(env), config)
-                    val linearGain = 10.0.pow(gainDb / 20.0).toFloat()
-                    val processed = sample * linearGain
-                    val clamped = processed.coerceIn(-ceilingLinear, ceilingLinear)
-                    output[idx] = (clamped * 32767.0f).coerceIn(-ceiling16Bit, ceiling16Bit).toInt().toShort()
+                    val targetGain = 10.0.pow(computeGainDb(levelToDbfs(envelope[ch]), config) / 20.0).toFloat()
+                    val startGain = currentGain[ch]
+                    val gainStep = (targetGain - startGain) / blockSize
+                    var g = startGain
+
+                    for (k in 0 until blockSize) {
+                        g += gainStep
+                        val idx = (frameOffset + k) * channels + ch
+                        val sample = input[idx] / 32768.0f
+                        val processed = sample * g
+                        val clamped = processed.coerceIn(-ceilingLinear, ceilingLinear)
+                        output[idx] = (clamped * 32767.0f).coerceIn(-ceiling16Bit, ceiling16Bit).toInt().toShort()
+                    }
+                    currentGain[ch] = targetGain
                 }
+                frameOffset += blockSize
             }
             return output
         }

@@ -148,6 +148,32 @@ class JellyseerrClient(
 
     companion object {
         fun create(
+            baseUrl: okhttp3.HttpUrl,
+            apiKey: String? = null,
+            connectTimeoutSeconds: Long = 10,
+            readTimeoutSeconds: Long = 10,
+            json: Json = Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                encodeDefaults = true
+                coerceInputValues = true
+                explicitNulls = false
+            },
+            localSeasonProvider: (suspend (String) -> Set<Int>)? = null,
+            localEpisodeProvider: (suspend (String) -> Map<Int, Int>)? = null
+        ): JellyseerrClient {
+            return create(
+                baseUrl = baseUrl.toString(),
+                apiKey = apiKey,
+                connectTimeoutSeconds = connectTimeoutSeconds,
+                readTimeoutSeconds = readTimeoutSeconds,
+                json = json,
+                localSeasonProvider = localSeasonProvider,
+                localEpisodeProvider = localEpisodeProvider
+            )
+        }
+
+        fun create(
             baseUrl: String,
             apiKey: String? = null,
             connectTimeoutSeconds: Long = 10,
@@ -162,26 +188,83 @@ class JellyseerrClient(
             localSeasonProvider: (suspend (String) -> Set<Int>)? = null,
             localEpisodeProvider: (suspend (String) -> Map<Int, Int>)? = null
         ): JellyseerrClient {
-            val normalizedBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
-
-            val okHttpClientBuilder = OkHttpClient.Builder()
+            val cleanUrl = baseUrl.trim().removeSuffix("/") + "/"
+            val okHttpClient = OkHttpClient.Builder()
                 .connectTimeout(connectTimeoutSeconds, TimeUnit.SECONDS)
                 .readTimeout(readTimeoutSeconds, TimeUnit.SECONDS)
+                .addInterceptor { chain ->
+                    val req = chain.request()
+                    val reqBuilder = req.newBuilder()
+                    if (!apiKey.isNullOrBlank()) {
+                        reqBuilder.header("X-Api-Key", apiKey)
+                    }
+                    chain.proceed(reqBuilder.build())
+                }
+                .build()
 
-            if (!apiKey.isNullOrBlank()) {
-                okHttpClientBuilder.addInterceptor(Interceptor { chain ->
-                    val request = chain.request().newBuilder()
-                        .header("X-Api-Key", apiKey)
-                        .build()
-                    chain.proceed(request)
-                })
-            }
-
-            val okHttpClient = okHttpClientBuilder.build()
             val contentType = "application/json".toMediaType()
-
             val retrofit = Retrofit.Builder()
-                .baseUrl(normalizedBaseUrl)
+                .baseUrl(cleanUrl)
+                .client(okHttpClient)
+                .addConverterFactory(json.asConverterFactory(contentType))
+                .build()
+
+            val service = retrofit.create(JellyseerrService::class.java)
+            val handler = RequestHandler(service, apiKey, json)
+            val detector = MissingSeasonDetector()
+
+            return JellyseerrClient(
+                service = service,
+                requestHandler = handler,
+                missingSeasonDetector = detector,
+                localSeasonProvider = localSeasonProvider,
+                localEpisodeProvider = localEpisodeProvider
+            )
+        }
+
+        fun createDynamic(
+            urlProvider: () -> String,
+            apiKey: String? = null,
+            connectTimeoutSeconds: Long = 10,
+            readTimeoutSeconds: Long = 10,
+            json: Json = Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                encodeDefaults = true
+                coerceInputValues = true
+                explicitNulls = false
+            },
+            localSeasonProvider: (suspend (String) -> Set<Int>)? = null,
+            localEpisodeProvider: (suspend (String) -> Map<Int, Int>)? = null
+        ): JellyseerrClient {
+            val okHttpClient = OkHttpClient.Builder()
+                .connectTimeout(connectTimeoutSeconds, TimeUnit.SECONDS)
+                .readTimeout(readTimeoutSeconds, TimeUnit.SECONDS)
+                .addInterceptor { chain ->
+                    val req = chain.request()
+                    val reqBuilder = req.newBuilder()
+                    if (!apiKey.isNullOrBlank()) {
+                        reqBuilder.header("X-Api-Key", apiKey)
+                    }
+                    val targetUrl = urlProvider().trim().removeSuffix("/")
+                    if (targetUrl.isNotBlank()) {
+                        val uri = runCatching { java.net.URI.create(targetUrl) }.getOrNull()
+                        if (uri != null && uri.host != null) {
+                            val newUrl = req.url.newBuilder()
+                                .scheme(uri.scheme ?: req.url.scheme)
+                                .host(uri.host)
+                                .port(if (uri.port != -1) uri.port else if (uri.scheme == "https") 443 else 80)
+                                .build()
+                            return@addInterceptor chain.proceed(reqBuilder.url(newUrl).build())
+                        }
+                    }
+                    chain.proceed(reqBuilder.build())
+                }
+                .build()
+
+            val contentType = "application/json".toMediaType()
+            val retrofit = Retrofit.Builder()
+                .baseUrl("http://localhost:5055/")
                 .client(okHttpClient)
                 .addConverterFactory(json.asConverterFactory(contentType))
                 .build()

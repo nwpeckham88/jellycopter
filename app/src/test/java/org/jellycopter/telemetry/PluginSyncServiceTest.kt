@@ -48,6 +48,22 @@ class PluginSyncServiceTest {
     }
 
     @Test
+    fun testProbePluginExtractsServerAudioDrcSettings() = runTest {
+        coEvery { api.ping() } returns Response.success(
+            PingResponseDto(
+                version = "1.0.0",
+                serverAudioDrcActive = true,
+                downmixAlgorithm = "dynaudnorm"
+            )
+        )
+
+        val available = service.probePlugin()
+        assertTrue(available)
+        assertEquals(true, service.serverAudioDrcActive.value)
+        assertEquals("dynaudnorm", service.serverDownmixAlgorithm.value)
+    }
+
+    @Test
     fun testProbePluginReturnsFalseOn404() = runTest {
         coEvery { api.ping() } returns Response.error(404, "".toResponseBody(null))
 

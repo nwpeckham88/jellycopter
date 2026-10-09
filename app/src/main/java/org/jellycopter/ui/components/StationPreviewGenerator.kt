@@ -159,27 +159,13 @@ fun StationPreviewArt(
                 ) {
                     val count = posters.take(3).size
                     posters.take(3).forEach { posterUrl ->
-                        SubcomposeAsyncImage(
+                        coil.compose.AsyncImage(
                             model = posterUrl,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .weight(1f)
-                                .fillMaxHeight(),
-                            error = {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(JellycopterTheme.colors.surfaceVariant)
-                                )
-                            },
-                            loading = {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(JellycopterTheme.colors.surfaceVariant)
-                                )
-                            }
+                                .fillMaxHeight()
                         )
                     }
                 }
@@ -201,21 +187,11 @@ fun StationPreviewArt(
             // Case 2: Single show artwork -> use backdrop or single poster
             !primaryBackdrop.isNullOrBlank() || posters.isNotEmpty() -> {
                 val imageUrl = primaryBackdrop ?: posters.first()
-                SubcomposeAsyncImage(
+                coil.compose.AsyncImage(
                     model = imageUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                    error = {
-                        StationFallbackGraphic(fallbackTitle = fallbackTitle)
-                    },
-                    loading = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(JellycopterTheme.colors.surfaceVariant)
-                        )
-                    }
+                    modifier = Modifier.fillMaxSize()
                 )
                 Box(
                     modifier = Modifier
@@ -242,8 +218,13 @@ fun StationPreviewArt(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(6.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color.Black.copy(alpha = 0.65f))
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color.Black.copy(alpha = 0.75f))
+                .border(
+                    width = 1.dp,
+                    color = Color(0x33FFFFFF),
+                    shape = RoundedCornerShape(4.dp)
+                )
                 .padding(horizontal = 6.dp, vertical = 2.dp)
         ) {
             Row(
@@ -254,12 +235,13 @@ fun StationPreviewArt(
                     imageVector = Icons.Rounded.Tv,
                     contentDescription = null,
                     tint = JellycopterTheme.colors.primaryAccent,
-                    modifier = Modifier.size(12.dp)
+                    modifier = Modifier.size(11.dp)
                 )
                 Text(
                     text = "STATION",
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.6.sp,
                     color = Color.White
                 )
             }

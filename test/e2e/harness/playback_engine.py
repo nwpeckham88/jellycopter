@@ -53,6 +53,23 @@ class DolbyVisionTrackSelector:
             "dvh1.07" in input_format.codecs or
             "dvhe.07" in input_format.codecs
         )
+        is_dv_profile5 = (
+            input_format.dv_profile == 5 or
+            "dvh1.05" in input_format.codecs or
+            "dvhe.05" in input_format.codecs
+        )
+
+        if is_dv_profile5:
+            if not caps.is_dv_supported:
+                # Profile 5 lacks HDR10 base layer: exclude from HDR10 fallback and route to MPV/transcode
+                return VideoFormat(
+                    sample_mime_type="video/mpv-fallback",
+                    codecs="route_to_mpv_or_transcode",
+                    dv_profile=5,
+                    color_space="ICtCp",
+                    color_transfer="SMPTE_ST_2084_PQ"
+                )
+            return input_format
 
         if not is_dv_profile7:
             return input_format

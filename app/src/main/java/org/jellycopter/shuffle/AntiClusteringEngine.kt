@@ -63,12 +63,20 @@ object AntiClusteringEngine {
                 weightedRandomChoice(candidates, weights, random)
             }
 
-            val chosenBucket = buckets[selectedKey] ?: break
-            if (chosenBucket.isEmpty()) break
-
-            val card = chosenBucket.removeAt(0)
-            shuffled.add(card)
-            lastCategoryKey = selectedKey
+            val chosenBucket = buckets[selectedKey]
+            if (chosenBucket.isNullOrEmpty()) {
+                // If selected bucket is empty, pick any non-empty active key
+                val fallbackKey = activeKeys.firstOrNull { (buckets[it]?.size ?: 0) > 0 } ?: break
+                val fallbackBucket = buckets[fallbackKey] ?: break
+                if (fallbackBucket.isEmpty()) break
+                val card = fallbackBucket.removeAt(0)
+                shuffled.add(card)
+                lastCategoryKey = fallbackKey
+            } else {
+                val card = chosenBucket.removeAt(0)
+                shuffled.add(card)
+                lastCategoryKey = selectedKey
+            }
         }
 
         return shuffled

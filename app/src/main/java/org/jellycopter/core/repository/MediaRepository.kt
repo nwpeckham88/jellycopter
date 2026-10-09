@@ -149,8 +149,8 @@ class DefaultMediaRepository(
         val session = sessionStorage?.getSession()
         if (session != null) {
             val url = "${session.serverUrl.removeSuffix("/")}/Users/${session.userId}/Items" +
-                    "?parentId=$folderId&includeItemTypes=Series&recursive=true" +
-                    "&fields=Overview,PrimaryImageAspectRatio,CommunityRating,PremiereDate,ProductionYear"
+                    "?parentId=$folderId&includeItemTypes=Series,Movie&recursive=true" +
+                    "&fields=Overview,PrimaryImageAspectRatio,CommunityRating,PremiereDate,ProductionYear,ProviderIds,ChildCount"
             val responseBody = executeGet(url, session.accessToken)
             if (responseBody != null) {
                 try {
@@ -167,6 +167,9 @@ class DefaultMediaRepository(
                             val rating = obj["CommunityRating"]?.jsonPrimitive?.floatOrNull
                             val year = obj["ProductionYear"]?.jsonPrimitive?.intOrNull
                                 ?: parseYearFromDate(obj["PremiereDate"]?.jsonPrimitive?.contentOrNull)
+                            val providerIds = obj["ProviderIds"]?.jsonObject ?: obj["providerIds"]?.jsonObject
+                            val tmdbId = providerIds?.get("Tmdb")?.jsonPrimitive?.contentOrNull?.toIntOrNull()
+                                ?: providerIds?.get("tmdb")?.jsonPrimitive?.contentOrNull?.toIntOrNull()
 
                             SeriesDetail(
                                 id = seriesId,
@@ -177,7 +180,8 @@ class DefaultMediaRepository(
                                 communityRating = rating,
                                 premiereYear = year,
                                 seasons = emptyList(),
-                                nextUpEpisode = null
+                                nextUpEpisode = null,
+                                tmdbId = tmdbId
                             )
                         }
                     }
@@ -205,6 +209,9 @@ class DefaultMediaRepository(
                     val rating = obj["CommunityRating"]?.jsonPrimitive?.floatOrNull
                     val year = obj["ProductionYear"]?.jsonPrimitive?.intOrNull
                         ?: parseYearFromDate(obj["PremiereDate"]?.jsonPrimitive?.contentOrNull)
+                    val providerIds = obj["ProviderIds"]?.jsonObject ?: obj["providerIds"]?.jsonObject
+                    val tmdbId = providerIds?.get("Tmdb")?.jsonPrimitive?.contentOrNull?.toIntOrNull()
+                        ?: providerIds?.get("tmdb")?.jsonPrimitive?.contentOrNull?.toIntOrNull()
 
                     val seasons = getSeasonsForSeries(resolvedId)
                     val nextUp = getNextUpForSeries(resolvedId)
@@ -218,7 +225,8 @@ class DefaultMediaRepository(
                         communityRating = rating,
                         premiereYear = year,
                         seasons = seasons,
-                        nextUpEpisode = nextUp
+                        nextUpEpisode = nextUp,
+                        tmdbId = tmdbId
                     )
                 } catch (_: Exception) {
                     // Fall through to mock dataset
@@ -479,7 +487,8 @@ object MockMediaDataset {
                 SeasonItem("season_sev_1", "series_1", 1, "Season 1", severanceEpisodesSeason1),
                 SeasonItem("season_sev_2", "series_1", 2, "Season 2", severanceEpisodesSeason2)
             ),
-            nextUpEpisode = severanceEpisodesSeason1[1] // S1E2 "Half Loop"
+            nextUpEpisode = severanceEpisodesSeason1[1], // S1E2 "Half Loop"
+            tmdbId = 97951
         ),
         "series_2" to SeriesDetail(
             id = "series_2",
@@ -495,7 +504,8 @@ object MockMediaDataset {
                 SeasonItem("season_sh_3", "series_2", 3, "Season 3", emptyList()),
                 SeasonItem("season_sh_4", "series_2", 4, "Season 4", emptyList())
             ),
-            nextUpEpisode = slowHorsesEpisodesSeason1[0]
+            nextUpEpisode = slowHorsesEpisodesSeason1[0],
+            tmdbId = 119243
         ),
         "series_3" to SeriesDetail(
             id = "series_3",
@@ -510,7 +520,8 @@ object MockMediaDataset {
                 SeasonItem("season_bear_2", "series_3", 2, "Season 2", emptyList()),
                 SeasonItem("season_bear_3", "series_3", 3, "Season 3", emptyList())
             ),
-            nextUpEpisode = theBearEpisodesSeason1[0]
+            nextUpEpisode = theBearEpisodesSeason1[0],
+            tmdbId = 136315
         ),
         "series_4" to SeriesDetail(
             id = "series_4",
@@ -523,7 +534,8 @@ object MockMediaDataset {
             seasons = listOf(
                 SeasonItem("season_fargo_1", "series_4", 1, "Season 1", fargoEpisodesSeason1)
             ),
-            nextUpEpisode = fargoEpisodesSeason1[0]
+            nextUpEpisode = fargoEpisodesSeason1[0],
+            tmdbId = 57243
         ),
         "series_5" to SeriesDetail(
             id = "series_5",
@@ -536,7 +548,8 @@ object MockMediaDataset {
             seasons = listOf(
                 SeasonItem("season_succ_1", "series_5", 1, "Season 1", successionEpisodesSeason1)
             ),
-            nextUpEpisode = successionEpisodesSeason1[0]
+            nextUpEpisode = successionEpisodesSeason1[0],
+            tmdbId = 76331
         ),
         "series_futurama" to SeriesDetail(
             id = "series_futurama",
@@ -549,7 +562,8 @@ object MockMediaDataset {
             seasons = listOf(
                 SeasonItem("season_fut_1", "series_futurama", 1, "Season 1", futuramaEpisodesSeason1)
             ),
-            nextUpEpisode = futuramaEpisodesSeason1[0]
+            nextUpEpisode = futuramaEpisodesSeason1[0],
+            tmdbId = 615
         ),
         "series_cowboy_bebop" to SeriesDetail(
             id = "series_cowboy_bebop",
@@ -562,7 +576,47 @@ object MockMediaDataset {
             seasons = listOf(
                 SeasonItem("season_bebop_1", "series_cowboy_bebop", 1, "Season 1", cowboyBebopEpisodesSeason1)
             ),
-            nextUpEpisode = cowboyBebopEpisodesSeason1[0]
+            nextUpEpisode = cowboyBebopEpisodesSeason1[0],
+            tmdbId = 2996
+        )
+    )
+
+    private val mockMovieDetails: Map<String, SeriesDetail> = mapOf(
+        "movie_dune2" to SeriesDetail(
+            id = "movie_dune2",
+            name = "Dune: Part Two",
+            overview = "Paul Atreides unites with Chani and the Fremen while seeking revenge against the conspirators who destroyed his family.",
+            posterUrl = "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=500&q=80",
+            backdropUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1280&q=80",
+            communityRating = 8.6f,
+            premiereYear = 2024,
+            seasons = emptyList(),
+            nextUpEpisode = null,
+            tmdbId = 693134
+        ),
+        "movie_bladerunner" to SeriesDetail(
+            id = "movie_bladerunner",
+            name = "Blade Runner 2049",
+            overview = "Young Blade Runner K's discovery of a long-buried secret leads him to track down former Blade Runner Rick Deckard.",
+            posterUrl = "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&q=80",
+            backdropUrl = "https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?w=1280&q=80",
+            communityRating = 8.0f,
+            premiereYear = 2017,
+            seasons = emptyList(),
+            nextUpEpisode = null,
+            tmdbId = 335984
+        ),
+        "movie_interstellar" to SeriesDetail(
+            id = "movie_interstellar",
+            name = "Interstellar",
+            overview = "When Earth becomes uninhabitable in the future, a farmer and ex-NASA pilot is tasked to pilot a spacecraft to find a new planet.",
+            posterUrl = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&q=80",
+            backdropUrl = "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=1280&q=80",
+            communityRating = 8.7f,
+            premiereYear = 2014,
+            seasons = emptyList(),
+            nextUpEpisode = null,
+            tmdbId = 157336
         )
     )
 
@@ -572,7 +626,7 @@ object MockMediaDataset {
                 mockSeriesDetails["series_futurama"]!!,
                 mockSeriesDetails["series_cowboy_bebop"]!!
             )
-            "folder_movies" -> emptyList()
+            "folder_movies" -> mockMovieDetails.values.toList()
             else -> listOf(
                 mockSeriesDetails["series_1"]!!,
                 mockSeriesDetails["series_2"]!!,
@@ -584,9 +638,10 @@ object MockMediaDataset {
     }
 
     fun getSeriesDetail(seriesId: String): SeriesDetail? {
-        return mockSeriesDetails[seriesId] ?: mockSeriesDetails.values.firstOrNull {
-            it.name.equals(seriesId, ignoreCase = true)
-        }
+        return mockSeriesDetails[seriesId]
+            ?: mockMovieDetails[seriesId]
+            ?: mockSeriesDetails.values.firstOrNull { it.name.equals(seriesId, ignoreCase = true) }
+            ?: mockMovieDetails.values.firstOrNull { it.name.equals(seriesId, ignoreCase = true) }
     }
 
     fun getNextUp(seriesId: String): EpisodeItem? {
@@ -612,12 +667,16 @@ object MockMediaDataset {
     fun getSeriesPoster(itemId: String): String? {
         val cleanId = itemId.removePrefix("series:").removePrefix("channel:").trim()
         return mockSeriesDetails[cleanId]?.posterUrl
+            ?: mockMovieDetails[cleanId]?.posterUrl
             ?: mockSeriesDetails.values.firstOrNull { it.name.equals(cleanId, ignoreCase = true) }?.posterUrl
+            ?: mockMovieDetails.values.firstOrNull { it.name.equals(cleanId, ignoreCase = true) }?.posterUrl
     }
 
     fun getSeriesBackdrop(itemId: String): String? {
         val cleanId = itemId.removePrefix("series:").removePrefix("channel:").trim()
         return mockSeriesDetails[cleanId]?.backdropUrl
+            ?: mockMovieDetails[cleanId]?.backdropUrl
             ?: mockSeriesDetails.values.firstOrNull { it.name.equals(cleanId, ignoreCase = true) }?.backdropUrl
+            ?: mockMovieDetails.values.firstOrNull { it.name.equals(cleanId, ignoreCase = true) }?.backdropUrl
     }
 }

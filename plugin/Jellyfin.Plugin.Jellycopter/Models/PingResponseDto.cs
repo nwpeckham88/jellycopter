@@ -14,4 +14,10 @@ public class PingResponseDto
 
     [JsonPropertyName("serverTimeUtc")]
     public DateTime ServerTimeUtc { get; set; } = DateTime.UtcNow;
+
+    [JsonPropertyName("serverAudioDrcActive")]
+    public bool ServerAudioDrcActive { get; set; } = false;
+
+    [JsonPropertyName("downmixAlgorithm")]
+    public string? DownmixAlgorithm { get; set; } = null;
 }

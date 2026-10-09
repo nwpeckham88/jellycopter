@@ -50,7 +50,10 @@ class RoomDeckRepository(
 
     override suspend fun saveDeck(deck: ShuffledDeck) {
         val cardsJson = json.encodeToString(deck.cards)
-        val exhaustedCardIds = deck.cards.filter { it.isExhausted }.map { it.id }
+        val exhaustedCardIds = deck.cards
+            .filter { it.isExhausted }
+            .flatMap { listOf(it.id) + it.itemIds }
+            .distinct()
         val exhaustedJson = json.encodeToString(exhaustedCardIds)
 
         val entity = DeckEntity(
@@ -123,12 +126,28 @@ class RoomDeckRepository(
             json.decodeFromString<List<MediaCard>>(entity.cardsJson)
         }.getOrDefault(emptyList())
 
+        val exhaustedIds = runCatching {
+            json.decodeFromString<List<String>>(entity.exhaustedCardIdsJson).toSet()
+        }.getOrDefault(emptySet())
+
+        val resolvedCards = if (exhaustedIds.isNotEmpty()) {
+            cards.map { card ->
+                if (card.isExhausted || exhaustedIds.contains(card.id) || card.itemIds.any { exhaustedIds.contains(it) }) {
+                    card.copy(isExhausted = true)
+                } else {
+                    card
+                }
+            }
+        } else {
+            cards
+        }
+
         return ShuffledDeck(
             deckId = entity.deckId,
             name = entity.name,
             seriesId = entity.seriesId,
             channelId = entity.channelId,
-            cards = cards,
+            cards = resolvedCards,
             currentIndex = entity.currentIndex,
             cycleNumber = entity.cycleNumber,
             midwayResumeMs = midwayResumeMs,

@@ -294,7 +294,7 @@ class TestAdversarialShuffleStress(unittest.TestCase):
                     )
                 )
 
-        trials = 100
+        trials = 150
         runs: List[List[str]] = []
         for t in range(trials):
             deck = self.engine.generate_single_show_deck("balanced_4", "Balanced 4 Show", episodes)

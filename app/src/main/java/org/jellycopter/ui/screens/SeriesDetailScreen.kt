@@ -273,18 +273,18 @@ fun SeriesDetailScreen(
                         modifier = Modifier
                             .width(145.dp)
                             .height(218.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(10.dp)
                     ) { isFocused ->
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(10.dp))
                                 .border(
                                     BorderStroke(
-                                        width = if (isFocused) 3.dp else 1.dp,
-                                        color = if (isFocused) Color.White else Color.White.copy(alpha = 0.15f)
+                                        width = 1.dp,
+                                        color = if (isFocused) Color(0x35FFFFFF) else Color(0x18FFFFFF)
                                     ),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(10.dp)
                                 )
                         ) {
                             if (!seriesDetail.posterUrl.isNullOrBlank()) {
@@ -322,9 +322,17 @@ fun SeriesDetailScreen(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(
+                            text = "SERIES DETAIL",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp,
+                            color = JellycopterTheme.colors.primaryAccent
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
                             text = seriesDetail.name,
                             fontSize = 30.sp,
-                            fontWeight = FontWeight.ExtraBold,
+                            fontWeight = FontWeight.Bold,
                             color = Color.White,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
@@ -591,8 +599,8 @@ private fun ActionButton(
 ) {
     FocusCard(
         onClick = onClick,
-        modifier = modifier.height(48.dp),
-        shape = RoundedCornerShape(10.dp)
+        modifier = modifier.height(44.dp),
+        shape = RoundedCornerShape(6.dp)
     ) { isFocused ->
         val bgColor = when {
             isFocused -> Color.White
@@ -613,6 +621,15 @@ private fun ActionButton(
             modifier = Modifier
                 .fillMaxSize()
                 .background(bgColor)
+                .border(
+                    width = 1.dp,
+                    color = when {
+                        isFocused -> Color.White
+                        isPrimary -> JellycopterTheme.colors.primaryAccent
+                        else -> Color(0x18FFFFFF)
+                    },
+                    shape = RoundedCornerShape(6.dp)
+                )
                 .padding(horizontal = 10.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -623,12 +640,12 @@ private fun ActionButton(
                 Icon(
                     imageVector = icon,
                     contentDescription = label,
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(20.dp),
                     tint = iconTint
                 )
                 Text(
                     text = label,
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = contentColor,
                     maxLines = 1,
@@ -647,7 +664,7 @@ private fun SeasonPill(
 ) {
     FocusCard(
         onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(6.dp),
         modifier = Modifier.height(36.dp)
     ) { isFocused ->
         val bgColor = when {
@@ -665,13 +682,22 @@ private fun SeasonPill(
             modifier = Modifier
                 .fillMaxSize()
                 .background(bgColor)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .border(
+                    width = 1.dp,
+                    color = when {
+                        isFocused -> Color.White
+                        isSelected -> JellycopterTheme.colors.primaryAccent
+                        else -> Color(0x18FFFFFF)
+                    },
+                    shape = RoundedCornerShape(6.dp)
+                )
+                .padding(horizontal = 16.dp, vertical = 7.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = season.name,
-                fontSize = 13.sp,
-                fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Normal,
+                fontSize = 12.sp,
+                fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium,
                 color = textColor
             )
         }
@@ -687,13 +713,18 @@ private fun EpisodeRowCard(
 ) {
     FocusCard(
         onClick = onPlay,
-        modifier = modifier.height(96.dp),
-        shape = RoundedCornerShape(12.dp)
+        modifier = modifier.height(92.dp),
+        shape = RoundedCornerShape(8.dp)
     ) { isFocused ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(if (isFocused) JellycopterTheme.colors.surfaceVariant else JellycopterTheme.colors.surface)
+                .border(
+                    width = 1.dp,
+                    color = if (isFocused) Color(0x35FFFFFF) else Color(0x12FFFFFF),
+                    shape = RoundedCornerShape(8.dp)
+                )
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Row(
@@ -705,8 +736,8 @@ private fun EpisodeRowCard(
                 Box(
                     modifier = Modifier
                         .width(110.dp)
-                        .height(72.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .height(70.dp)
+                        .clip(RoundedCornerShape(6.dp))
                         .background(Color(0xFF1E293B)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -738,15 +769,15 @@ private fun EpisodeRowCard(
                     }
                     Box(
                         modifier = Modifier
-                            .size(28.dp)
+                            .size(26.dp)
                             .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.55f)),
+                            .background(Color.Black.copy(alpha = 0.65f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.PlayArrow,
                             contentDescription = "Play",
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(16.dp),
                             tint = Color.White
                         )
                     }
@@ -760,15 +791,23 @@ private fun EpisodeRowCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "E${episode.indexNumber}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = JellycopterTheme.colors.primaryAccent
-                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(JellycopterTheme.colors.primaryAccent.copy(alpha = 0.15f))
+                                .border(1.dp, JellycopterTheme.colors.primaryAccent.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "E${episode.indexNumber}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = JellycopterTheme.colors.primaryAccent
+                            )
+                        }
                         Text(
                             text = episode.name,
-                            fontSize = 15.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                             maxLines = 1,
@@ -777,7 +816,7 @@ private fun EpisodeRowCard(
                     }
 
                     if (!episode.overview.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(3.dp))
                         Text(
                             text = episode.overview,
                             fontSize = 12.sp,
@@ -801,16 +840,17 @@ private fun EpisodeRowCard(
                 // Play Button visual indicator (card click triggers onPlay)
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
-                        .background(if (isFocused) JellycopterTheme.colors.primaryAccent else JellycopterTheme.colors.surfaceVariant),
+                        .background(if (isFocused) Color.White else Color.White.copy(alpha = 0.08f))
+                        .border(1.dp, if (isFocused) Color.White else Color(0x18FFFFFF), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.PlayArrow,
                         contentDescription = "Play",
-                        modifier = Modifier.size(24.dp),
-                        tint = if (isFocused) Color.Black else JellycopterTheme.colors.onSurface
+                        modifier = Modifier.size(20.dp),
+                        tint = if (isFocused) Color.Black else Color.White
                     )
                 }
             }

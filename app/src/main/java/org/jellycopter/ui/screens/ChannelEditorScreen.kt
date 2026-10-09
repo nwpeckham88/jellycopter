@@ -34,7 +34,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -42,7 +45,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -111,6 +119,7 @@ fun ChannelEditorScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showSeriesPicker by remember { mutableStateOf(false) }
 
+    val focusManager = LocalFocusManager.current
     val accent = JellycopterTheme.colors.primaryAccent
     val surface = JellycopterTheme.colors.surface
     val surfaceVariant = JellycopterTheme.colors.surfaceVariant
@@ -202,22 +211,31 @@ fun ChannelEditorScreen(
             ) {
                 Column {
                     Text(
+                        text = "VIRTUAL BROADCAST",
+                        color = accent,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
                         text = if (isEditing) "Edit Channel" else "Create Channel",
                         color = textPrimary,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Build your custom TV station",
+                        text = "Build your custom virtual TV station",
                         color = textSecondary,
-                        fontSize = 14.sp
+                        fontSize = 13.sp
                     )
                 }
                 Icon(
                     imageVector = Icons.Rounded.Tv,
                     contentDescription = null,
                     tint = accent,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(28.dp)
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -231,9 +249,12 @@ fun ChannelEditorScreen(
                 label = { Text("Channel Name", color = textSecondary) },
                 placeholder = { Text("e.g. Night 'Toons", color = textSecondary.copy(alpha = 0.5f)) },
                 modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                shape = RoundedCornerShape(8.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = accent,
-                    unfocusedBorderColor = textSecondary.copy(alpha = 0.3f),
+                    unfocusedBorderColor = Color(0x20FFFFFF),
                     focusedTextColor = textPrimary,
                     unfocusedTextColor = textPrimary,
                     cursorColor = accent
@@ -249,9 +270,12 @@ fun ChannelEditorScreen(
                 onValueChange = { channelDescription = it },
                 label = { Text("Description (optional)", color = textSecondary) },
                 modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                shape = RoundedCornerShape(8.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = accent,
-                    unfocusedBorderColor = textSecondary.copy(alpha = 0.3f),
+                    unfocusedBorderColor = Color(0x20FFFFFF),
                     focusedTextColor = textPrimary,
                     unfocusedTextColor = textPrimary,
                     cursorColor = accent
@@ -468,17 +492,22 @@ fun ChannelEditorScreen(
                 FocusCard(
                     onClick = onCancel,
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(8.dp)
                 ) { isFocused ->
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(if (isFocused) surfaceVariant else Color.Transparent)
-                            .border(1.dp, if (isFocused) accent else textSecondary.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                            .background(if (isFocused) Color.White else Color.White.copy(alpha = 0.08f))
+                            .border(1.dp, if (isFocused) Color.White else Color(0x18FFFFFF), RoundedCornerShape(8.dp))
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("Cancel", color = textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = "Cancel",
+                            color = if (isFocused) Color.Black else textPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
 
@@ -504,7 +533,7 @@ fun ChannelEditorScreen(
                         }
                     },
                     modifier = Modifier.weight(2f),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(8.dp)
                 ) { isFocused ->
                     Box(
                         modifier = Modifier
@@ -512,7 +541,7 @@ fun ChannelEditorScreen(
                             .background(
                                 when {
                                     !canSave -> surfaceVariant.copy(alpha = 0.5f)
-                                    isFocused -> JellycopterTheme.colors.borderGlow
+                                    isFocused -> Color.White
                                     else -> accent
                                 }
                             )
@@ -524,14 +553,15 @@ fun ChannelEditorScreen(
                                 imageVector = Icons.Rounded.Shuffle,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp),
-                                tint = if (canSave) Color.Black else textSecondary
+                                tint = if (isFocused) Color.Black else if (canSave) Color.White else textSecondary
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = if (isEditing) "Save Changes" else "Create Channel",
-                                color = if (canSave) Color.Black else textSecondary,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
+                                color = if (isFocused) Color.Black else if (canSave) Color.White else textSecondary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.4.sp
                             )
                         }
                     }
@@ -613,6 +643,14 @@ private fun OptionPickerDialog(
     onOptionSelected: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val initialFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        try {
+            initialFocusRequester.requestFocus()
+        } catch (_: Exception) {}
+    }
+
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = JellycopterTheme.colors.surface,
@@ -629,11 +667,20 @@ private fun OptionPickerDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                val targetFocusValue = options.find { it.first == selectedOption }?.first ?: options.firstOrNull()?.first
                 options.forEach { (value, label) ->
                     val isSelected = value == selectedOption
+                    val shouldRequestFocus = value == targetFocusValue
+                    val cardModifier = if (shouldRequestFocus) {
+                        Modifier
+                            .fillMaxWidth()
+                            .focusRequester(initialFocusRequester)
+                    } else {
+                        Modifier.fillMaxWidth()
+                    }
                     FocusCard(
                         onClick = { onOptionSelected(value) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = cardModifier,
                         shape = RoundedCornerShape(8.dp)
                     ) { isFocused ->
                         Row(

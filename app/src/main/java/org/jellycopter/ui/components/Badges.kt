@@ -24,35 +24,39 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jellycopter.ui.theme.JellycopterTheme
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+
 /**
- * Apple-style frosted metadata chip (e.g. "1080p", "4K", "DOLBY VISION", "22 min left").
+ * Precision studio-grade metadata chip (e.g. "1080p", "4K", "DOLBY VISION", "22 min left").
  */
 @Composable
 fun MetadataChip(
     text: String,
     modifier: Modifier = Modifier,
     accentColor: Color = Color(0xFFF1F5F9),
-    backgroundColor: Color = Color(0x26FFFFFF)
+    backgroundColor: Color = Color(0x24FFFFFF)
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(4.dp))
             .background(backgroundColor)
-            .padding(horizontal = 7.dp, vertical = 3.dp),
+            .border(BorderStroke(1.dp, Color(0x2AFFFFFF)), RoundedCornerShape(4.dp))
+            .padding(horizontal = 7.dp, vertical = 2.5.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
             color = accentColor,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.4.sp
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.6.sp
         )
     }
 }
 
 /**
- * Exhaustion Progress Badge: displays cycle progress (e.g. "42/250 played" or "68%").
+ * Exhaustion Progress Badge: displays cycle progress (e.g. "42/250 played (17%)").
  */
 @Composable
 fun ExhaustionBadge(
@@ -65,23 +69,25 @@ fun ExhaustionBadge(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0x40000000))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .clip(RoundedCornerShape(5.dp))
+            .background(Color(0x66000000))
+            .border(BorderStroke(1.dp, Color(0x22FFFFFF)), RoundedCornerShape(5.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
             color = JellycopterTheme.colors.primaryAccent,
             fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.3.sp
         )
     }
 }
 
 /**
  * Midway Resume Indicator: displays a small horizontal progress bar
- * if playback is midway (between 0% and 80%).
+ * if playback is midway (between 2% and 80%).
  */
 @Composable
 fun MidwayResumeIndicator(
@@ -99,10 +105,10 @@ fun MidwayResumeIndicator(
                 progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp)),
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(1.5.dp)),
                 color = JellycopterTheme.colors.primaryAccent,
-                trackColor = Color(0x66000000)
+                trackColor = Color(0x55000000)
             )
         }
     }
@@ -115,26 +121,49 @@ fun MidwayResumeIndicator(
 fun MissingSeasonBadge(
     seasonNumber: Int,
     onRequestClicked: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isRequested: Boolean = false
 ) {
-    FocusCard(
-        onClick = onRequestClicked,
-        shape = RoundedCornerShape(8.dp),
-        modifier = modifier
-    ) { isFocused ->
+    if (isRequested) {
         Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(if (isFocused) JellycopterTheme.colors.primaryAccent else Color(0xEEBE123C))
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0x2010B981))
+                .border(BorderStroke(1.dp, Color(0x6010B981)), RoundedCornerShape(6.dp))
+                .padding(horizontal = 9.dp, vertical = 4.5.dp),
             contentAlignment = Alignment.Center
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "S$seasonNumber REQUESTED",
+                color = Color(0xFF10B981),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.2.sp
+            )
+        }
+    } else {
+        FocusCard(
+            onClick = onRequestClicked,
+            shape = RoundedCornerShape(6.dp),
+            modifier = modifier
+        ) { isFocused ->
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (isFocused) Color.White else Color(0x2CF43F5E))
+                    .border(
+                        BorderStroke(1.dp, if (isFocused) Color.White else Color(0x66F43F5E)),
+                        RoundedCornerShape(6.dp)
+                    )
+                    .padding(horizontal = 9.dp, vertical = 4.5.dp),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = "Missing S$seasonNumber • Request",
-                    color = if (isFocused) Color.Black else Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "Missing S$seasonNumber - Request",
+                    color = if (isFocused) Color.Black else Color(0xFFFDA4AF),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.2.sp
                 )
             }
         }

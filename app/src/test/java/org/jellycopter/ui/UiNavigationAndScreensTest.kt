@@ -257,4 +257,51 @@ class UiNavigationAndScreensTest {
             violations.isEmpty()
         )
     }
+
+    @Test
+    fun testLibraryCatalogFilterAndSortEnums() {
+        assertEquals("All Titles", org.jellycopter.ui.screens.CatalogFilter.ALL.label)
+        assertEquals("Missing Seasons", org.jellycopter.ui.screens.CatalogFilter.MISSING_SEASONS.label)
+        assertEquals("Top Rated (8.5+)", org.jellycopter.ui.screens.CatalogFilter.TOP_RATED.label)
+
+        assertEquals("Name (A-Z)", org.jellycopter.ui.screens.CatalogSort.NAME_ASC.label)
+        assertEquals("Rating (High-Low)", org.jellycopter.ui.screens.CatalogSort.RATING_DESC.label)
+        assertEquals("Year (Newest)", org.jellycopter.ui.screens.CatalogSort.YEAR_DESC.label)
+    }
+
+    @Test
+    fun testMockMediaDatasetMoviesAndTmdbIds() {
+        // Movies folder now returns rich mock movie data
+        val movies = org.jellycopter.core.repository.MockMediaDataset.getSeriesForFolder("folder_movies")
+        assertTrue("Movies folder should return mock movies", movies.isNotEmpty())
+        assertEquals(3, movies.size)
+        assertTrue(movies.any { it.name == "Dune: Part Two" && it.tmdbId == 693134 })
+
+        // TV series have non-zero tmdbIds populated
+        val severance = org.jellycopter.core.repository.MockMediaDataset.getSeriesDetail("series_1")
+        assertNotNull(severance)
+        assertEquals(97951, severance?.tmdbId)
+
+        val slowHorses = org.jellycopter.core.repository.MockMediaDataset.getSeriesDetail("series_2")
+        assertNotNull(slowHorses)
+        assertEquals(119243, slowHorses?.tmdbId)
+    }
+
+    @Test
+    fun testLibrarySeriesItemContract() {
+        val item = org.jellycopter.ui.screens.LibrarySeriesItem(
+            seriesId = "series_bear",
+            title = "The Bear",
+            totalSeasons = 3,
+            localSeasonsCount = 1,
+            missingSeasonNumbers = listOf(2, 3),
+            tmdbId = 136315
+        )
+        assertEquals("series_bear", item.seriesId)
+        assertEquals("The Bear", item.title)
+        assertEquals(3, item.totalSeasons)
+        assertEquals(1, item.localSeasonsCount)
+        assertEquals(listOf(2, 3), item.missingSeasonNumbers)
+        assertEquals(136315, item.tmdbId)
+    }
 }

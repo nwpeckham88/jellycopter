@@ -55,13 +55,14 @@ data class MixChannelItem(
     val totalCount: Int
 )
 
+private val channelJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
 /**
  * Converts a live [ChannelEntity] to the UI model [MixChannelItem] for display.
  */
 private fun ChannelEntity.toMixChannelItem(): MixChannelItem {
     val shows = runCatching {
-        kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-            .decodeFromString<List<String>>(showsJson)
+        channelJson.decodeFromString<List<String>>(showsJson)
     }.getOrDefault(emptyList())
     return MixChannelItem(
         channelId = channelId,
@@ -86,6 +87,7 @@ fun ShuffleChannelsScreen(
     /** Live channels from Room DB — when null, falls back to hardcoded preview data */
     liveChannels: List<ChannelEntity>? = null,
     mediaRepository: MediaRepository? = null,
+    availableSeries: List<org.jellycopter.core.model.SeriesDetail> = emptyList(),
     onLaunchChannel: (ChannelEntity) -> Unit = {},
     onCreateChannel: () -> Unit = {},
     onEditChannel: (ChannelEntity) -> Unit = {},
@@ -104,40 +106,32 @@ fun ShuffleChannelsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 6.dp),
+                    .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .width(3.dp)
-                                .height(20.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(JellycopterTheme.colors.primaryAccent)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Channels",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
-                        )
-                    }
                     Text(
-                        text = "Custom multi-show broadcast stations",
-                        fontSize = 13.sp,
-                        color = Color(0xFF94A3B8),
-                        modifier = Modifier.padding(start = 13.dp)
+                        text = "VIRTUAL BROADCAST",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp,
+                        color = JellycopterTheme.colors.primaryAccent
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Channels",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
                     )
                 }
 
                 // New Channel button
                 FocusCard(
                     onClick = onCreateChannel,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(40.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(38.dp)
                 ) { isFocused ->
                     Box(
                         modifier = Modifier
@@ -207,6 +201,7 @@ fun ShuffleChannelsScreen(
             ChannelRow(
                 entity = entity,
                 mediaRepository = mediaRepository,
+                availableSeries = availableSeries,
                 onLaunch = { onLaunchChannel(entity) },
                 onEdit = { onEditChannel(entity) }
             )
@@ -218,20 +213,21 @@ fun ShuffleChannelsScreen(
 private fun ChannelRow(
     entity: ChannelEntity,
     mediaRepository: MediaRepository?,
+    availableSeries: List<org.jellycopter.core.model.SeriesDetail> = emptyList(),
     onLaunch: () -> Unit,
     onEdit: () -> Unit
 ) {
     val item = entity.toMixChannelItem()
-    val showNames = remember(entity.showsJson, mediaRepository) {
-        StationPreviewGenerator.resolveShowTitles(entity.showsJson, mediaRepository)
+    val showNames = remember(entity.showsJson, mediaRepository, availableSeries) {
+        StationPreviewGenerator.resolveShowTitles(entity.showsJson, mediaRepository, availableSeries)
     }
 
     FocusCard(
         onClick = onLaunch,
         modifier = Modifier
             .fillMaxWidth()
-            .height(116.dp),
-        shape = RoundedCornerShape(16.dp)
+            .height(112.dp),
+        shape = RoundedCornerShape(12.dp)
     ) { isFocused ->
         Box(
             modifier = Modifier
@@ -239,6 +235,11 @@ private fun ChannelRow(
                 .background(
                     if (isFocused) JellycopterTheme.colors.surfaceVariant
                     else JellycopterTheme.colors.surface.copy(alpha = 0.85f)
+                )
+                .border(
+                    width = 1.dp,
+                    color = if (isFocused) Color(0x35FFFFFF) else Color(0x12FFFFFF),
+                    shape = RoundedCornerShape(12.dp)
                 )
                 .padding(horizontal = 20.dp, vertical = 14.dp)
         ) {
@@ -273,15 +274,28 @@ private fun ChannelRow(
                             )
                             if (showNames.isNotEmpty()) {
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "${showNames.size} show${if (showNames.size == 1) "" else "s"}",
-                                    fontSize = 11.sp,
-                                    color = JellycopterTheme.colors.primaryAccent,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(JellycopterTheme.colors.primaryAccent.copy(alpha = 0.15f))
+                                        .border(
+                                            width = 1.dp,
+                                            color = JellycopterTheme.colors.primaryAccent.copy(alpha = 0.35f),
+                                            shape = RoundedCornerShape(4.dp)
+                                        )
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "${showNames.size} SHOW${if (showNames.size == 1) "" else "S"}",
+                                        fontSize = 10.sp,
+                                        color = JellycopterTheme.colors.primaryAccent,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
                             }
                         }
-                        Spacer(modifier = Modifier.height(3.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = item.description,
                             fontSize = 12.sp,
@@ -292,7 +306,7 @@ private fun ChannelRow(
                         if (showNames.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(3.dp))
                             Text(
-                                text = (showNames.take(4) as Iterable<String>).joinToString(separator = " · "),
+                                text = (showNames.take(4) as Iterable<String>).joinToString(separator = "  ·  "),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = Color(0xFF64748B),
@@ -303,12 +317,12 @@ private fun ChannelRow(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
                 // Edit button (small, always visible)
                 FocusCard(
                     onClick = onEdit,
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(6.dp),
                     modifier = Modifier.size(36.dp)
                 ) { editFocused ->
                     Box(
@@ -316,7 +330,12 @@ private fun ChannelRow(
                             .fillMaxSize()
                             .background(
                                 if (editFocused) Color.White
-                                else Color.White.copy(alpha = 0.08f)
+                                else Color.White.copy(alpha = 0.07f)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (editFocused) Color.White else Color(0x18FFFFFF),
+                                shape = RoundedCornerShape(6.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -329,17 +348,17 @@ private fun ChannelRow(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
-                // Play button
+                // Play / Tune In button
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
+                        .clip(RoundedCornerShape(6.dp))
                         .background(
                             if (isFocused) Color.White
                             else JellycopterTheme.colors.primaryAccent
                         )
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 16.dp, vertical = 9.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(
@@ -349,14 +368,15 @@ private fun ChannelRow(
                         Icon(
                             imageVector = if (isFocused) Icons.Rounded.PlayArrow else Icons.Rounded.Shuffle,
                             contentDescription = if (isFocused) "Tune In" else "Shuffle Play",
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(15.dp),
                             tint = if (isFocused) Color.Black else Color.White
                         )
                         Text(
                             text = if (isFocused) "Tune In" else "Shuffle Play",
-                            fontSize = 13.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isFocused) Color.Black else Color.White
+                            color = if (isFocused) Color.Black else Color.White,
+                            letterSpacing = 0.4.sp
                         )
                     }
                 }

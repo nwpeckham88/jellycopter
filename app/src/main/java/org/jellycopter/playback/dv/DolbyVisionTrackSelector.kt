@@ -29,12 +29,15 @@ class DolbyVisionTrackSelector(
         enum class Action {
             PASSTHROUGH,
             REWRITE_TO_PROFILE_8_1,
-            FALLBACK_TO_HDR10
+            FALLBACK_TO_HDR10,
+            ROUTE_TO_MPV,
+            TRANSCODE
         }
     }
 
     /**
-     * Inspects a video format and applies Dolby Vision Profile 8.1 rewriting or clean HDR10 fallback.
+     * Inspects a video format and applies Dolby Vision Profile 8.1 rewriting, clean HDR10 fallback,
+     * or routing to MPV/transcode for Profile 5 streams lacking an HDR10 base layer.
      */
     fun resolveDolbyVisionTrack(
         format: Format,
@@ -49,6 +52,26 @@ class DolbyVisionTrackSelector(
         }
 
         val isProfile7 = isProfile7Format(format)
+        val isProfile5 = isProfile5Format(format)
+
+        if (isProfile5) {
+            return if (!customCapabilities.supportsDolbyVision) {
+                // Profile 5 uses proprietary ICtCp (IPTPQc2) color space and lacks an HDR10 base layer.
+                // Exclude from HDR10 fallback to prevent severe color shifts (green/purple tint).
+                // Route to MPV or transcode instead.
+                TrackOverride(
+                    targetFormat = format,
+                    action = TrackOverride.Action.ROUTE_TO_MPV,
+                    reason = "Dolby Vision Profile 5 lacks an HDR10 base layer; excluded from HDR10 fallback and routed to MPV/transcode to prevent severe color shifts"
+                )
+            } else {
+                TrackOverride(
+                    targetFormat = format,
+                    action = TrackOverride.Action.PASSTHROUGH,
+                    reason = "Device supports native Dolby Vision Profile 5 playback"
+                )
+            }
+        }
 
         return if (isProfile7) {
             if (customCapabilities.supportsDvProfile81 && !customCapabilities.supportsDvProfile7) {
@@ -75,7 +98,7 @@ class DolbyVisionTrackSelector(
                 )
             }
         } else {
-            // Other DV profiles (e.g. Profile 8 or Profile 5)
+            // Profile 8 or other standard DV profile with HDR10 base layer
             if (!customCapabilities.supportsDolbyVision) {
                 val hdr10 = cleanFallbackToHdr10(format)
                 TrackOverride(
@@ -177,6 +200,19 @@ class DolbyVisionTrackSelector(
             for (data in format.initializationData) {
                 val record = DolbyVisionConfigRecord.parse(data)
                 if (record != null && record.profile == DolbyVisionConfigRecord.PROFILE_DV_PROFILE_7) {
+                    return true
+                }
+            }
+            return false
+        }
+
+        fun isProfile5Format(format: Format): Boolean {
+            val codecs = format.codecs ?: ""
+            if (codecs.contains(".05.")) return true
+
+            for (data in format.initializationData) {
+                val record = DolbyVisionConfigRecord.parse(data)
+                if (record != null && record.profile == DolbyVisionConfigRecord.PROFILE_DV_PROFILE_5) {
                     return true
                 }
             }

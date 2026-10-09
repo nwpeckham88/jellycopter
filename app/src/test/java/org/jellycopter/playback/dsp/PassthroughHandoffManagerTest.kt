@@ -79,4 +79,23 @@ class PassthroughHandoffManagerTest {
         manager.setNightMode(true)
         assertEquals(PassthroughHandoffManager.AudioRoutingMode.PCM_DSP, manager.currentMode.value)
     }
+
+    @Test
+    fun testServerDownmixOverridesToPcmDirect() {
+        val manager = PassthroughHandoffManager(initialPassthroughSupported = true)
+        manager.setCurrentStream("audio/true-hd")
+        manager.setNightMode(true)
+        manager.setForceStereo(true)
+
+        // Without server downmix, PCM_DSP is active
+        assertEquals(PassthroughHandoffManager.AudioRoutingMode.PCM_DSP, manager.currentMode.value)
+
+        // When server downmix is active, it forces PCM_DIRECT to prevent duplicate DSP
+        manager.setServerDownmixActive(true)
+        assertEquals(PassthroughHandoffManager.AudioRoutingMode.PCM_DIRECT, manager.currentMode.value)
+
+        // When server downmix ceases, returns to PCM_DSP
+        manager.setServerDownmixActive(false)
+        assertEquals(PassthroughHandoffManager.AudioRoutingMode.PCM_DSP, manager.currentMode.value)
+    }
 }

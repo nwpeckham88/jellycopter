@@ -44,6 +44,8 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -51,28 +53,30 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.jellycopter.core.repository.AuthRepository
 import org.jellycopter.core.settings.SettingsRepository
 import org.jellycopter.sync.PluginSyncService
 import org.jellycopter.ui.components.FocusCard
 import org.jellycopter.ui.theme.BaseThemeMode
 import org.jellycopter.ui.theme.JellycopterTheme
-import java.util.concurrent.TimeUnit
+import org.jellycopter.ui.viewmodel.SettingsViewModel
 
 @Composable
 fun SettingsScreen(
@@ -80,9 +84,13 @@ fun SettingsScreen(
     authRepository: AuthRepository? = null,
     pluginSyncService: PluginSyncService? = null,
     onSignOut: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: SettingsViewModel? = null
 ) {
-    val scope = rememberCoroutineScope()
+    val vm = viewModel ?: remember(settingsRepository, authRepository, pluginSyncService) {
+        SettingsViewModel(settingsRepository, authRepository, pluginSyncService)
+    }
+    val focusManager = LocalFocusManager.current
     val session = remember(authRepository) { authRepository?.getSession() }
 
     // Theme state
@@ -117,36 +125,12 @@ fun SettingsScreen(
     var jellyseerrUrlText by remember { mutableStateOf(initialJellyseerr) }
     var jellyseerrSaveStatus by remember { mutableStateOf<String?>(null) }
 
-    // Plugin Sync Probe Status
-    var pluginStatus by remember { mutableStateOf("Checking companion plugin...") }
-    var isProbingPlugin by remember { mutableStateOf(false) }
+    // Plugin Sync Probe Status from ViewModel
+    val pluginStatus = vm.pluginStatus
+    val isProbingPlugin = vm.isProbingPlugin
 
     fun checkPlugin() {
-        isProbingPlugin = true
-        scope.launch {
-            if (pluginSyncService != null) {
-                val available = pluginSyncService.probePlugin()
-                pluginStatus = if (available) "Connected (v1.0.0 Active)" else "Plugin not detected (Local fallback active)"
-            } else {
-                val serverUrl = session?.serverUrl
-                if (!serverUrl.isNullOrBlank()) {
-                    withContext(Dispatchers.IO) {
-                        try {
-                            val client = OkHttpClient.Builder().connectTimeout(3, TimeUnit.SECONDS).build()
-                            val pingUrl = if (serverUrl.endsWith("/")) "${serverUrl}Jellycopter/Ping" else "$serverUrl/Jellycopter/Ping"
-                            val req = Request.Builder().url(pingUrl).build()
-                            val resp = client.newCall(req).execute()
-                            pluginStatus = if (resp.isSuccessful) "Connected (v1.0.0 Active)" else "Plugin not detected (Local fallback active)"
-                        } catch (_: Exception) {
-                            pluginStatus = "Plugin not detected (Local fallback active)"
-                        }
-                    }
-                } else {
-                    pluginStatus = "Plugin not detected (Local fallback active)"
-                }
-            }
-            isProbingPlugin = false
-        }
+        vm.probePlugin(session?.serverUrl)
     }
 
     LaunchedEffect(Unit) {
@@ -163,23 +147,21 @@ fun SettingsScreen(
         // Screen Header
         item {
             Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .width(3.dp)
-                            .height(22.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(JellycopterTheme.colors.primaryAccent)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Settings & Configuration",
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "PREFERENCES",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.2.sp,
+                    color = JellycopterTheme.colors.primaryAccent
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Settings & Configuration",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Manage server connection, themes, audio DSP processing, and integrations",
                     fontSize = 13.sp,
@@ -260,10 +242,7 @@ fun SettingsScreen(
 
                         FocusCard(
                             onClick = {
-                                scope.launch {
-                                    authRepository?.logout()
-                                    onSignOut()
-                                }
+                                vm.logout(onComplete = onSignOut)
                             },
                             shape = RoundedCornerShape(10.dp)
                         ) { isFocused ->
@@ -394,142 +373,55 @@ fun SettingsScreen(
                 title = "Audio DSP & Night Mode Defaults",
                 icon = Icons.AutoMirrored.Rounded.VolumeUp
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    // DRC Toggle
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Night Mode DRC (Dynamic Range Compression)",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "Boosts whisper/dialogue quiet passages and clamps sudden loud explosive transients",
-                                fontSize = 11.sp,
-                                color = Color(0xFF94A3B8)
-                            )
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    // DRC Toggle Card
+                    SettingsToggleCard(
+                        title = "Night Mode DRC (Dynamic Range Compression)",
+                        description = "Boosts whisper/dialogue quiet passages and clamps sudden loud explosive transients",
+                        checked = drcEnabled,
+                        onCheckedChange = {
+                            drcEnabled = it
+                            settingsRepository?.setNightModeDrcEnabled(it)
                         }
+                    )
 
-                        Switch(
-                            checked = drcEnabled,
-                            onCheckedChange = {
-                                drcEnabled = it
-                                settingsRepository?.setNightModeDrcEnabled(it)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = JellycopterTheme.colors.primaryAccent
-                            )
-                        )
-                    }
-
-                    // Force Stereo Toggle
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "ITU-R BS.775 Force Stereo Downmixing",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "Downmixes 5.1/7.1 surround sound to 2.0 stereo with dialogue center channel enhancement",
-                                fontSize = 11.sp,
-                                color = Color(0xFF94A3B8)
-                            )
+                    // Force Stereo Toggle Card
+                    SettingsToggleCard(
+                        title = "ITU-R BS.775 Force Stereo Downmixing",
+                        description = "Downmixes 5.1/7.1 surround sound to 2.0 stereo with dialogue center channel enhancement",
+                        checked = forceStereoEnabled,
+                        onCheckedChange = {
+                            forceStereoEnabled = it
+                            settingsRepository?.setForceStereoEnabled(it)
                         }
+                    )
 
-                        Switch(
-                            checked = forceStereoEnabled,
-                            onCheckedChange = {
-                                forceStereoEnabled = it
-                                settingsRepository?.setForceStereoEnabled(it)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = JellycopterTheme.colors.primaryAccent
-                            )
-                        )
-                    }
-
-                    // Center Dialogue Boost Slider
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Center Dialogue Boost",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = String.format("+%.1f dB", centerBoostDb),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JellycopterTheme.colors.primaryAccent
-                            )
+                    // Center Dialogue Boost D-pad Slider Card
+                    SettingsSliderCard(
+                        title = "Center Dialogue Boost",
+                        valueText = String.format("+%.1f dB", centerBoostDb),
+                        value = centerBoostDb,
+                        valueRange = 0.0f..6.0f,
+                        stepSize = 0.5f,
+                        steps = 11,
+                        onValueChange = {
+                            centerBoostDb = it
+                            settingsRepository?.setCenterBoostDb(it)
                         }
-                        Slider(
-                            value = centerBoostDb,
-                            onValueChange = {
-                                centerBoostDb = it
-                                settingsRepository?.setCenterBoostDb(it)
-                            },
-                            valueRange = 0.0f..6.0f,
-                            steps = 11,
-                            colors = SliderDefaults.colors(
-                                thumbColor = Color.White,
-                                activeTrackColor = JellycopterTheme.colors.primaryAccent
-                            )
-                        )
-                    }
+                    )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                    // Auto Night Mode Scheduled Quiet Hours
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Auto Night Mode Quiet Hours",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "Automatically activates Dynamic Range Compression during scheduled night hours (crosses midnight)",
-                                fontSize = 11.sp,
-                                color = Color(0xFF94A3B8)
-                            )
+                    // Auto Night Mode Scheduled Quiet Hours Toggle Card
+                    SettingsToggleCard(
+                        title = "Auto Night Mode Quiet Hours",
+                        description = "Automatically activates Dynamic Range Compression during scheduled night hours (crosses midnight)",
+                        checked = autoNightEnabled,
+                        onCheckedChange = {
+                            autoNightEnabled = it
+                            settingsRepository?.setAutoNightModeEnabled(it)
                         }
-
-                        Switch(
-                            checked = autoNightEnabled,
-                            onCheckedChange = {
-                                autoNightEnabled = it
-                                settingsRepository?.setAutoNightModeEnabled(it)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = JellycopterTheme.colors.primaryAccent
-                            )
-                        )
-                    }
+                    )
 
                     if (autoNightEnabled) {
                         Column(
@@ -561,6 +453,8 @@ fun SettingsScreen(
                                     label = { Text("Start Time") },
                                     placeholder = { Text("22:30") },
                                     singleLine = true,
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Right) }),
                                     modifier = Modifier.weight(1f),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedBorderColor = JellycopterTheme.colors.primaryAccent,
@@ -579,6 +473,8 @@ fun SettingsScreen(
                                     label = { Text("End Time") },
                                     placeholder = { Text("07:00") },
                                     singleLine = true,
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                                     modifier = Modifier.weight(1f),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedBorderColor = JellycopterTheme.colors.primaryAccent,
@@ -639,96 +535,55 @@ fun SettingsScreen(
                 title = "Subtitle Dimming & HDR Glare Reduction",
                 icon = Icons.Rounded.Subtitles
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    // Subtitle Dimmer Toggle Card
+                    SettingsToggleCard(
+                        title = "HDR Subtitle Luminance Dimmer",
+                        description = "Attenuates caption luminance to prevent blinding eye strain on HDR10 and Dolby Vision displays in dark rooms",
+                        checked = subtitleDimmerEnabled,
+                        onCheckedChange = {
+                            subtitleDimmerEnabled = it
+                            settingsRepository?.setSubtitleDimmerEnabled(it)
+                        }
+                    )
+
+                    // Luminance Attenuation D-pad Slider Card
+                    SettingsSliderCard(
+                        title = "Luminance Attenuation Level",
+                        valueText = String.format("%.0f%% Dimmed", subtitleDimRatio * 100),
+                        value = subtitleDimRatio,
+                        valueRange = 0.10f..0.90f,
+                        stepSize = 0.10f,
+                        steps = 7,
+                        onValueChange = {
+                            subtitleDimRatio = it
+                            settingsRepository?.setSubtitleDimRatio(it)
+                        }
+                    )
+
+                    // Visual Preview Swatch for TV 10-foot UI
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF0F172A))
+                            .border(BorderStroke(1.dp, Color(0x30FFFFFF)), RoundedCornerShape(8.dp))
+                            .padding(vertical = 12.dp, horizontal = 16.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "HDR Subtitle Luminance Dimmer",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "Attenuates caption luminance to prevent blinding eye strain on HDR10 and Dolby Vision displays in dark rooms",
-                                fontSize = 11.sp,
-                                color = Color(0xFF94A3B8)
-                            )
-                        }
-
-                        Switch(
-                            checked = subtitleDimmerEnabled,
-                            onCheckedChange = {
-                                subtitleDimmerEnabled = it
-                                settingsRepository?.setSubtitleDimmerEnabled(it)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = JellycopterTheme.colors.primaryAccent
-                            )
+                        val factor = if (subtitleDimmerEnabled) (1.0f - subtitleDimRatio) else 1.0f
+                        val textColor = Color(
+                            red = factor,
+                            green = factor,
+                            blue = factor,
+                            alpha = 1.0f
                         )
-                    }
-
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Luminance Attenuation Level",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = String.format("%.0f%% Dimmed", subtitleDimRatio * 100),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = JellycopterTheme.colors.primaryAccent
-                            )
-                        }
-                        Slider(
-                            value = subtitleDimRatio,
-                            onValueChange = {
-                                subtitleDimRatio = it
-                                settingsRepository?.setSubtitleDimRatio(it)
-                            },
-                            valueRange = 0.10f..0.90f,
-                            steps = 7,
-                            colors = SliderDefaults.colors(
-                                thumbColor = Color.White,
-                                activeTrackColor = JellycopterTheme.colors.primaryAccent
-                            )
+                        Text(
+                            text = if (subtitleDimmerEnabled) "Preview: Attenuated Subtitle Caption" else "Preview: Standard 100% White Subtitle",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = textColor
                         )
-
-                        // Visual Preview Swatch for TV 10-foot UI
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF0F172A))
-                                .border(BorderStroke(1.dp, Color(0x30FFFFFF)), RoundedCornerShape(8.dp))
-                                .padding(vertical = 12.dp, horizontal = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val factor = if (subtitleDimmerEnabled) (1.0f - subtitleDimRatio) else 1.0f
-                            val textColor = Color(
-                                red = factor,
-                                green = factor,
-                                blue = factor,
-                                alpha = 1.0f
-                            )
-                            Text(
-                                text = if (subtitleDimmerEnabled) "Preview: Attenuated Subtitle Caption" else "Preview: Standard 100% White Subtitle",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = textColor
-                            )
-                        }
                     }
                 }
             }
@@ -828,6 +683,8 @@ fun SettingsScreen(
                             )
                         },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = JellycopterTheme.colors.primaryAccent,
                             unfocusedBorderColor = Color(0x35FFFFFF),
@@ -913,37 +770,38 @@ private fun SettingsCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(JellycopterTheme.colors.surface)
             .border(
-                BorderStroke(1.dp, Color(0x22FFFFFF)),
-                RoundedCornerShape(16.dp)
+                BorderStroke(1.dp, Color(0x18FFFFFF)),
+                RoundedCornerShape(12.dp)
             )
-            .padding(20.dp)
+            .padding(18.dp)
     ) {
         Column {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = 14.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(JellycopterTheme.colors.surfaceVariant),
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(JellycopterTheme.colors.primaryAccent.copy(alpha = 0.15f))
+                        .border(1.dp, JellycopterTheme.colors.primaryAccent.copy(alpha = 0.35f), RoundedCornerShape(6.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(18.dp),
                         tint = JellycopterTheme.colors.primaryAccent
                     )
                 }
                 Text(
                     text = title,
-                    fontSize = 17.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
@@ -953,3 +811,160 @@ private fun SettingsCard(
         }
     }
 }
+
+@Composable
+private fun SettingsToggleCard(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    FocusCard(
+        onClick = { onCheckedChange(!checked) },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp)
+    ) { isFocused ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (isFocused) JellycopterTheme.colors.surfaceVariant else Color(0x0EFFFFFF))
+                .border(
+                    BorderStroke(
+                        1.dp,
+                        if (isFocused) Color(0x35FFFFFF) else Color(0x12FFFFFF)
+                    ),
+                    RoundedCornerShape(8.dp)
+                )
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(
+                    text = title,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = description,
+                    fontSize = 11.sp,
+                    color = Color(0xFF94A3B8)
+                )
+            }
+
+            Switch(
+                checked = checked,
+                onCheckedChange = null,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = JellycopterTheme.colors.primaryAccent,
+                    uncheckedThumbColor = Color(0xFF94A3B8),
+                    uncheckedTrackColor = Color(0x25FFFFFF)
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsSliderCard(
+    title: String,
+    valueText: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    stepSize: Float,
+    steps: Int,
+    onValueChange: (Float) -> Unit
+) {
+    FocusCard(
+        onClick = {},
+        modifier = Modifier
+            .fillMaxWidth()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.key) {
+                        Key.DirectionLeft -> {
+                            val newVal = (value - stepSize).coerceIn(valueRange.start, valueRange.endInclusive)
+                            onValueChange(newVal)
+                            true
+                        }
+                        Key.DirectionRight -> {
+                            val newVal = (value + stepSize).coerceIn(valueRange.start, valueRange.endInclusive)
+                            onValueChange(newVal)
+                            true
+                        }
+                        else -> false
+                    }
+                } else {
+                    false
+                }
+            },
+        shape = RoundedCornerShape(8.dp)
+    ) { isFocused ->
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (isFocused) JellycopterTheme.colors.surfaceVariant else Color(0x0EFFFFFF))
+                .border(
+                    BorderStroke(
+                        1.dp,
+                        if (isFocused) Color(0x35FFFFFF) else Color(0x12FFFFFF)
+                    ),
+                    RoundedCornerShape(8.dp)
+                )
+                .padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isFocused) {
+                        Text(
+                            text = "◄ ",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = JellycopterTheme.colors.primaryAccent
+                        )
+                    }
+                    Text(
+                        text = valueText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = JellycopterTheme.colors.primaryAccent
+                    )
+                    if (isFocused) {
+                        Text(
+                            text = " ►",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = JellycopterTheme.colors.primaryAccent
+                        )
+                    }
+                }
+            }
+            Slider(
+                value = value,
+                onValueChange = onValueChange,
+                valueRange = valueRange,
+                steps = steps,
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = JellycopterTheme.colors.primaryAccent
+                )
+            )
+        }
+    }
+}
+

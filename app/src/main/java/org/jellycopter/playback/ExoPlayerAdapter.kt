@@ -2,19 +2,35 @@ package org.jellycopter.playback
 
 import android.content.Context
 import android.view.Surface
+import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DecoderReuseEvaluation
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.audio.AudioCapabilities
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import org.jellycopter.core.model.DrcConfig
 import org.jellycopter.playback.dsp.PlaybackAudioProcessorChain
 import org.jellycopter.playback.dv.DolbyVisionTrackSelector
+
+/**
+ * Custom track selector bridge that wraps Media3's [DefaultTrackSelector]
+ * and evaluates Dolby Vision video stream configurations.
+ */
+@UnstableApi
+open class DolbyVisionTrackSelectorBridge(
+    context: Context,
+    val dvTrackSelector: DolbyVisionTrackSelector = DolbyVisionTrackSelector()
+) : DefaultTrackSelector(context)
 
 /**
  * Media3 ExoPlayer implementation of [PlayerAdapter].
@@ -30,17 +46,46 @@ class ExoPlayerAdapter(
     override val name: String = "Media3 ExoPlayer"
     override val isAvailable: Boolean = true
 
+    val mediaSourceFactory: DefaultMediaSourceFactory? = context?.let { DefaultMediaSourceFactory(it) }
+    val trackSelectorBridge: DolbyVisionTrackSelectorBridge? = context?.let {
+        DolbyVisionTrackSelectorBridge(it, dvTrackSelector)
+    }
+
     private val player: ExoPlayer? = injectedPlayer ?: run {
         if (context != null) {
-            val audioSink = DefaultAudioSink.Builder(context)
-                .setAudioProcessors(audioProcessorChain.getAudioProcessors())
+            val renderersFactory = object : DefaultRenderersFactory(context) {
+                override fun buildAudioSink(
+                    context: Context,
+                    enableFloatOutput: Boolean,
+                    enableAudioTrackPlaybackParams: Boolean
+                ): androidx.media3.exoplayer.audio.AudioSink {
+                    return DefaultAudioSink.Builder(context)
+                        .setAudioCapabilities(AudioCapabilities.getCapabilities(context))
+                        .setAudioProcessors(audioProcessorChain.getAudioProcessors())
+                        .build()
+                }
+            }.apply {
+                setEnableDecoderFallback(true)
+                setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+            }
+
+            val loadControl = DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                    /* minBufferMs = */ 15_000,
+                    /* maxBufferMs = */ 60_000,
+                    /* bufferForPlaybackMs = */ 2_500,
+                    /* bufferForPlaybackAfterRebufferMs = */ 5_000
+                )
+                .setPrioritizeTimeOverSizeThresholds(true)
                 .build()
 
-            val trackSelector = DefaultTrackSelector(context)
+            val builder = ExoPlayer.Builder(context, renderersFactory)
+                .setLoadControl(loadControl)
 
-            ExoPlayer.Builder(context)
-                .setTrackSelector(trackSelector)
-                .build()
+            trackSelectorBridge?.let { builder.setTrackSelector(it) }
+            mediaSourceFactory?.let { builder.setMediaSourceFactory(it) }
+
+            builder.build()
         } else {
             null
         }
@@ -71,6 +116,13 @@ class ExoPlayerAdapter(
         setupPlayerListeners()
     }
 
+    /**
+     * Resolves a video format using the configured [DolbyVisionTrackSelector].
+     */
+    fun resolveDolbyVisionTrack(format: Format): DolbyVisionTrackSelector.TrackOverride {
+        return dvTrackSelector.resolveDolbyVisionTrack(format)
+    }
+
     private fun setupPlayerListeners() {
         player?.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -82,6 +134,30 @@ class ExoPlayerAdapter(
                 notifyStateChanged(isPlaying, buffering)
                 if (playbackState == Player.STATE_ENDED) {
                     notifyPlaybackEnded()
+                }
+            }
+
+            override fun onTracksChanged(tracks: Tracks) {
+                for (group in tracks.groups) {
+                    if (group.type == C.TRACK_TYPE_VIDEO && group.isSelected) {
+                        for (i in 0 until group.length) {
+                            if (group.isTrackSelected(i)) {
+                                val format = group.getTrackFormat(i)
+                                if (DolbyVisionTrackSelector.isDolbyVisionFormat(format)) {
+                                    val override = dvTrackSelector.resolveDolbyVisionTrack(format)
+                                    if (override.action == DolbyVisionTrackSelector.TrackOverride.Action.ROUTE_TO_MPV) {
+                                        notifyError(
+                                            PlaybackException(
+                                                "Dolby Vision Profile 5 not natively supported on this display; routing to MPV",
+                                                null,
+                                                PlaybackException.ERROR_CODE_DECODER_INIT_FAILED
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -113,7 +189,12 @@ class ExoPlayerAdapter(
         simulatedPositionMs = startPositionMs
         if (player != null) {
             val mediaItem = MediaItem.fromUri(uri)
-            player.setMediaItem(mediaItem)
+            val mediaSource = mediaSourceFactory?.createMediaSource(mediaItem)
+            if (mediaSource != null) {
+                player.setMediaSource(mediaSource)
+            } else {
+                player.setMediaItem(mediaItem)
+            }
             if (startPositionMs > 0) {
                 player.seekTo(startPositionMs)
             }

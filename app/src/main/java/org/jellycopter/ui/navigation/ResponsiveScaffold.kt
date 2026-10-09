@@ -170,26 +170,8 @@ private fun TvLeanbackLayout(
             modifier = Modifier
                 .width(railWidth)
                 .fillMaxHeight()
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            JellycopterTheme.colors.surface.copy(alpha = 0.98f),
-                            JellycopterTheme.colors.surface.copy(alpha = 0.92f)
-                        )
-                    )
-                )
-                .border(
-                    BorderStroke(
-                        1.dp,
-                        Brush.verticalGradient(
-                            listOf(
-                                JellycopterTheme.colors.borderGlow.copy(alpha = 0.25f),
-                                Color(0x12FFFFFF),
-                                Color(0x04FFFFFF)
-                            )
-                        )
-                    )
-                )
+                .background(JellycopterTheme.colors.surface.copy(alpha = 0.96f))
+                .border(BorderStroke(1.dp, Color(0x14FFFFFF)))
                 .onFocusChanged { railHasFocus = it.hasFocus }
                 .padding(vertical = 18.dp, horizontal = 10.dp),
             horizontalAlignment = Alignment.Start
@@ -209,38 +191,31 @@ private fun TvLeanbackLayout(
                     Box(
                         modifier = Modifier
                             .size(38.dp)
-                            .clip(RoundedCornerShape(11.dp))
-                            .background(
-                                Brush.radialGradient(
-                                    listOf(
-                                        JellycopterTheme.colors.primaryAccent.copy(alpha = 0.28f),
-                                        JellycopterTheme.colors.surfaceVariant
-                                    )
-                                )
-                            )
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0x16FFFFFF))
                             .border(
-                                BorderStroke(1.dp, JellycopterTheme.colors.primaryAccent.copy(alpha = 0.40f)),
-                                RoundedCornerShape(11.dp)
+                                BorderStroke(1.dp, Color(0x24FFFFFF)),
+                                RoundedCornerShape(10.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         JellycopterLogo(
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(22.dp),
                             tint = JellycopterTheme.colors.primaryAccent
                         )
                     }
                 }
 
                 if (railWidth > 120.dp) {
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Column(
                         modifier = Modifier.padding(end = 6.dp)
                     ) {
                         Text(
                             text = "JELLYCOPTER",
-                            fontSize = 13.5.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.sp,
+                            letterSpacing = 1.2.sp,
                             color = JellycopterTheme.colors.onBackground,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -249,7 +224,8 @@ private fun TvLeanbackLayout(
                             text = "Media Lounge",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Medium,
-                            color = JellycopterTheme.colors.secondaryAccent.copy(alpha = 0.9f),
+                            letterSpacing = 0.4.sp,
+                            color = JellycopterTheme.colors.onSurface.copy(alpha = 0.6f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -321,59 +297,44 @@ private fun TvLeanbackLayout(
                 content()
             }
 
-            // Top-right floating frosted status chip (Streak + Brand + Real-time Clock)
+            // Top-right floating frosted status capsule (Brand + Real-time Clock)
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 20.dp, end = 36.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(JellycopterTheme.colors.surfaceVariant.copy(alpha = 0.85f))
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0x1AFFFFFF))
                     .border(
-                        BorderStroke(1.dp, JellycopterTheme.colors.borderGlow.copy(alpha = 0.25f)),
-                        RoundedCornerShape(18.dp)
+                        BorderStroke(1.dp, Color(0x22FFFFFF)),
+                        RoundedCornerShape(16.dp)
                     )
-                    .padding(horizontal = 14.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.LocalFireDepartment,
-                    contentDescription = "Streak",
-                    modifier = Modifier.size(16.dp),
-                    tint = JellycopterTheme.colors.primaryAccent
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Active",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = JellycopterTheme.colors.primaryAccent
-                )
-                Text(
-                    text = "  •  ",
-                    fontSize = 11.sp,
-                    color = JellycopterTheme.colors.onSurface.copy(alpha = 0.4f)
-                )
                 JellycopterLogo(
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(15.dp),
                     tint = JellycopterTheme.colors.primaryAccent
                 )
-                Spacer(modifier = Modifier.width(5.dp))
                 Text(
-                    text = "Jellycopter",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = JellycopterTheme.colors.onBackground
-                )
-                Text(
-                    text = "  •  ",
+                    text = "JELLYCOPTER",
                     fontSize = 11.sp,
-                    color = JellycopterTheme.colors.onSurface.copy(alpha = 0.4f)
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.1.sp,
+                    color = Color.White
+                )
+                Box(
+                    modifier = Modifier
+                        .size(3.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x55FFFFFF))
                 )
                 Text(
                     text = currentTime,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = JellycopterTheme.colors.onSurface.copy(alpha = 0.85f)
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.3.sp,
+                    color = Color(0xFFCBD5E1)
                 )
             }
         }
@@ -382,10 +343,10 @@ private fun TvLeanbackLayout(
 
 /**
  * Modern TV Navigation Rail Item:
- * - Borderless & backgroundless when idle/unfocused (no clunky button boxes)
- * - Luminous gradient focus pill with crisp focus border and scale
- * - Left vertical accent indicator pill for the active route
- * - Rock-solid stationary icon position at constant X coordinate during rail expansion/collapse
+ * - Borderless & backgroundless when idle/unfocused
+ * - High-contrast crisp focus pill with clean focus border and smooth scale
+ * - Sleek vertical accent indicator for active route
+ * - Rock-solid stationary icon position during rail expansion/collapse
  */
 @Composable
 private fun TvRailItem(
@@ -400,10 +361,10 @@ private fun TvRailItem(
     var isFocused by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
 
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(10.dp)
 
     val iconScale by animateFloatAsState(
-        targetValue = if (isFocused) 1.12f else 1.0f,
+        targetValue = if (isFocused) 1.10f else 1.0f,
         animationSpec = tween(150),
         label = "railIconScale"
     )
@@ -411,25 +372,24 @@ private fun TvRailItem(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(46.dp)
+            .height(44.dp)
             .clip(shape)
             .background(
                 brush = when {
-                    isFocused -> Brush.horizontalGradient(
-                        listOf(
-                            JellycopterTheme.colors.primaryAccent.copy(alpha = 0.32f),
-                            JellycopterTheme.colors.surfaceVariant.copy(alpha = 0.90f)
-                        )
-                    )
-                    isSelected -> SolidColor(JellycopterTheme.colors.primaryAccent.copy(alpha = 0.15f))
+                    isFocused -> SolidColor(Color(0x2AFFFFFF))
+                    isSelected -> SolidColor(JellycopterTheme.colors.primaryAccent.copy(alpha = 0.14f))
                     else -> SolidColor(Color.Transparent)
                 },
                 shape = shape
             )
             .border(
                 BorderStroke(
-                    width = if (isFocused) 1.5.dp else 0.dp,
-                    color = if (isFocused) JellycopterTheme.colors.borderGlow else Color.Transparent
+                    width = if (isFocused) 1.5.dp else if (isSelected) 1.dp else 0.dp,
+                    color = when {
+                        isFocused -> Color.White
+                        isSelected -> JellycopterTheme.colors.primaryAccent.copy(alpha = 0.30f)
+                        else -> Color.Transparent
+                    }
                 ),
                 shape = shape
             )
@@ -460,9 +420,9 @@ private fun TvRailItem(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .padding(start = 3.dp)
-                    .width(3.5.dp)
-                    .height(22.dp)
-                    .clip(RoundedCornerShape(2.dp))
+                    .width(3.dp)
+                    .height(18.dp)
+                    .clip(RoundedCornerShape(1.5.dp))
                     .background(if (isFocused) Color.White else JellycopterTheme.colors.primaryAccent)
             )
         }

@@ -368,16 +368,32 @@ private fun SeasonQualityDialog(
                     color = JellycopterTheme.colors.onSurface.copy(alpha = 0.8f)
                 )
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = selectAllSeasons,
-                        onCheckedChange = { selectAllSeasons = it },
-                        colors = CheckboxDefaults.colors(
-                            checkedColor = JellycopterTheme.colors.primaryAccent
+                FocusCard(
+                    onClick = { selectAllSeasons = !selectAllSeasons },
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) { isFocused ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(if (isFocused) JellycopterTheme.colors.surfaceVariant else Color.Transparent)
+                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
+                        Checkbox(
+                            checked = selectAllSeasons,
+                            onCheckedChange = null,
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = JellycopterTheme.colors.primaryAccent
+                            )
                         )
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Request All Future & Current Seasons", color = JellycopterTheme.colors.onSurface, fontSize = 13.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Request All Future & Current Seasons",
+                            color = JellycopterTheme.colors.onSurface,
+                            fontSize = 13.sp
+                        )
+                    }
                 }
 
                 Text(

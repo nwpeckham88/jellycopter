@@ -215,7 +215,7 @@ class MissingSeasonDetectorTest {
 
             val client = JellyseerrClient.create(
                 baseUrl = server.url("/api/v1/"),
-                localSeasonProvider = { seriesId ->
+                localSeasonProvider = { seriesId: String ->
                     if (seriesId == "jellyfin_got_series") setOf(1) else emptySet()
                 }
             )

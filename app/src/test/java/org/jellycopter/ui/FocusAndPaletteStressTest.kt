@@ -174,9 +174,9 @@ class FocusAndPaletteStressTest {
     @Test
     fun testMasterBaseThemeColorValues() {
         val warm = JellycopterThemeDefaults.getBaseColors(BaseThemeMode.WARM_DARK)
-        assertEquals(Color(0xFF14110E), warm.background)
-        assertEquals(Color(0xFFF59E0B), warm.primaryAccent)
-        assertEquals(Color(0xFFE07A5F), warm.secondaryAccent)
+        assertEquals(Color(0xFF0C0E14), warm.background)
+        assertEquals(Color(0xFFF5A623), warm.primaryAccent)
+        assertEquals(Color(0xFF38BDF8), warm.secondaryAccent)
 
         val oled = JellycopterThemeDefaults.getBaseColors(BaseThemeMode.OLED_PURE_BLACK)
         assertEquals(Color(0xFF000000), oled.background)

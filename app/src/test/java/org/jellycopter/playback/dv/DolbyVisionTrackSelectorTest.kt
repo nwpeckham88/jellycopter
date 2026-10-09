@@ -135,4 +135,44 @@ class DolbyVisionTrackSelectorTest {
         val idrHeaderByte: Byte = 0x26.toByte()
         assertFalse(DolbyVisionTrackSelector.isRpuNalHeader(idrHeaderByte))
     }
+
+    @Test
+    fun testProfile5OnNonDvDisplayRoutesToMpv() {
+        val nonDvCaps = DeviceCapabilities.createNonDvHdr10()
+        val selector = DolbyVisionTrackSelector(nonDvCaps)
+
+        val rawP5Record = DolbyVisionConfigRecord.create(
+            profile = 5,
+            level = 6,
+            rpuPresent = true,
+            elPresent = false,
+            blPresent = true,
+            compatibilityId = 0
+        )
+        val formatP5 = Format.Builder()
+            .setSampleMimeType(MimeTypes.VIDEO_DOLBY_VISION)
+            .setCodecs("dvh1.05.06")
+            .setInitializationData(listOf(rawP5Record))
+            .build()
+
+        val override = selector.resolveDolbyVisionTrack(formatP5)
+
+        // Must be excluded from HDR10 fallback (which causes green/purple color shifts) and routed to MPV/transcode
+        assertEquals(DolbyVisionTrackSelector.TrackOverride.Action.ROUTE_TO_MPV, override.action)
+    }
+
+    @Test
+    fun testProfile5OnDvDisplayPassesThrough() {
+        val shieldCaps = DeviceCapabilities.createShieldTv()
+        val selector = DolbyVisionTrackSelector(shieldCaps)
+
+        val formatP5 = Format.Builder()
+            .setSampleMimeType(MimeTypes.VIDEO_DOLBY_VISION)
+            .setCodecs("dvhe.05.06")
+            .build()
+
+        val override = selector.resolveDolbyVisionTrack(formatP5)
+
+        assertEquals(DolbyVisionTrackSelector.TrackOverride.Action.PASSTHROUGH, override.action)
+    }
 }

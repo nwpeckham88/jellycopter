@@ -55,11 +55,31 @@ public class ShuffleDeckStore : IShuffleDeckStore
                 .Distinct()
                 .ToList();
 
-            // Resume position conflict: the entry with more recent UpdatedAtUtc supplies last played item & position
-            var useIncomingResume = incoming.UpdatedAtUtc >= existing.UpdatedAtUtc;
-            var lastPlayed = useIncomingResume ? incoming.LastPlayedItemId : existing.LastPlayedItemId;
-            var lastResumeTicks = useIncomingResume ? incoming.LastResumePositionTicks : existing.LastResumePositionTicks;
-            var mostRecentUpdated = useIncomingResume ? incoming.UpdatedAtUtc : existing.UpdatedAtUtc;
+            // Resume position conflict: preserve active resume position if incoming has no resume data, or use most recent if both present
+            var incomingHasResume = !string.IsNullOrEmpty(incoming.LastPlayedItemId) && incoming.LastResumePositionTicks > 0;
+            var existingHasResume = !string.IsNullOrEmpty(existing.LastPlayedItemId) && existing.LastResumePositionTicks > 0;
+
+            string? lastPlayed;
+            long lastResumeTicks;
+
+            if (incomingHasResume && existingHasResume)
+            {
+                var useIncoming = incoming.UpdatedAtUtc >= existing.UpdatedAtUtc;
+                lastPlayed = useIncoming ? incoming.LastPlayedItemId : existing.LastPlayedItemId;
+                lastResumeTicks = useIncoming ? incoming.LastResumePositionTicks : existing.LastResumePositionTicks;
+            }
+            else if (incomingHasResume)
+            {
+                lastPlayed = incoming.LastPlayedItemId;
+                lastResumeTicks = incoming.LastResumePositionTicks;
+            }
+            else
+            {
+                lastPlayed = existing.LastPlayedItemId;
+                lastResumeTicks = existing.LastResumePositionTicks;
+            }
+
+            var mostRecentUpdated = incoming.UpdatedAtUtc >= existing.UpdatedAtUtc ? incoming.UpdatedAtUtc : existing.UpdatedAtUtc;
 
             return new DeckSyncDto
             {

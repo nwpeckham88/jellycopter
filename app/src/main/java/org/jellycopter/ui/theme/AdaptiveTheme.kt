@@ -37,51 +37,51 @@ val LocalJellycopterColors = staticCompositionLocalOf {
 
 object JellycopterThemeDefaults {
     val warmDarkColors = JellycopterColors(
-        background = Color(0xFF14110E),
-        surface = Color(0xFF1E1815),
-        surfaceVariant = Color(0xFF2C221D),
-        primaryAccent = Color(0xFFF59E0B),
-        secondaryAccent = Color(0xFFE07A5F),
-        onBackground = Color(0xFFFDF8F2),
-        onSurface = Color(0xFFEDE4DC),
-        ambientGlow = Color(0x4DF59E0B),
-        borderGlow = Color(0xFFFBBF24)
+        background = Color(0xFF0C0E14),
+        surface = Color(0xFF141824),
+        surfaceVariant = Color(0xFF1D2232),
+        primaryAccent = Color(0xFFF5A623),
+        secondaryAccent = Color(0xFF38BDF8),
+        onBackground = Color(0xFFF8FAFC),
+        onSurface = Color(0xFFE2E8F0),
+        ambientGlow = Color(0x22F5A623),
+        borderGlow = Color(0xFFFFD56B)
     )
 
     val oledPureBlackColors = JellycopterColors(
         background = Color(0xFF000000),
-        surface = Color(0xFF101010),
-        surfaceVariant = Color(0xFF1C1C1C),
+        surface = Color(0xFF0C0D12),
+        surfaceVariant = Color(0xFF161822),
         primaryAccent = Color(0xFF3B82F6),
         secondaryAccent = Color(0xFF94A3B8),
         onBackground = Color(0xFFFFFFFF),
-        onSurface = Color(0xFFEDEDED),
-        ambientGlow = Color(0x333B82F6),
-        borderGlow = Color(0xFF60A5FA)
+        onSurface = Color(0xFFE2E8F0),
+        ambientGlow = Color(0x183B82F6),
+        borderGlow = Color(0xFF93C5FD)
     )
 
     val jellyfinPurpleColors = JellycopterColors(
         background = Color(0xFF050714),
-        surface = Color(0xFF121528),
-        surfaceVariant = Color(0xFF1E2240),
+        surface = Color(0xFF0E1122),
+        surfaceVariant = Color(0xFF181C35),
         primaryAccent = Color(0xFFAA5CC3),
         secondaryAccent = Color(0xFF00A4DC),
         onBackground = Color(0xFFFFFFFF),
         onSurface = Color(0xFFECEFF4),
-        ambientGlow = Color(0x4DAA5CC3),
-        borderGlow = Color(0xFFC084FC)
+        ambientGlow = Color(0x1FAA5CC3),
+        borderGlow = Color(0xFFD8B4FE)
     )
 
     val cyberpunkNeonColors = JellycopterColors(
         background = Color(0xFF070913),
-        surface = Color(0xFF131424),
-        surfaceVariant = Color(0xFF1F2038),
+        surface = Color(0xFF0E111F),
+        surfaceVariant = Color(0xFF171B30),
         primaryAccent = Color(0xFF00F0FF),
         secondaryAccent = Color(0xFFFF0055),
         onBackground = Color(0xFFFFFFFF),
         onSurface = Color(0xFFE0F7FA),
-        ambientGlow = Color(0x4D00F0FF),
-        borderGlow = Color(0xFF22D3EE)
+        ambientGlow = Color(0x1A00F0FF),
+        borderGlow = Color(0xFF67E8F9)
     )
 
     fun getBaseColors(mode: BaseThemeMode): JellycopterColors {

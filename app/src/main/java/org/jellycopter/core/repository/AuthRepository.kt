@@ -99,7 +99,7 @@ class DefaultAuthRepository(
 
         try {
             android.util.Log.d("AuthRepository", "Calling authenticateByNameByUrl at $authUrl...")
-            val response = apiService.authenticateByNameByUrl(authUrl, header, request)
+            val response = apiService.authenticateByNameByUrl(authUrl, header, header, request)
             android.util.Log.d("AuthRepository", "Authenticate response code: ${response.code()}")
             if (response.isSuccessful && response.body() != null) {
                 val body = response.body()!!

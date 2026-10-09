@@ -369,9 +369,13 @@ class PlaybackActivity : ComponentActivity() {
         playbackEngine?.play(mediaCard, startPositionMs)
     }
 
+    private var lastAdvanceTimestamp = 0L
+
     private fun advanceToNextEpisode(isManualSkip: Boolean) {
-        if (isAdvancing) return
+        val now = System.currentTimeMillis()
+        if (isAdvancing || (!isManualSkip && now - lastAdvanceTimestamp < 1500L)) return
         isAdvancing = true
+        lastAdvanceTimestamp = now
         lifecycleScope.launch {
             try {
                 val action = if (isManualSkip) {
@@ -406,6 +410,7 @@ class PlaybackActivity : ComponentActivity() {
                     }
                 }
             } finally {
+                delay(500L)
                 isAdvancing = false
             }
         }
@@ -628,8 +633,12 @@ private fun PlaybackScreen(
                     }
                 },
                 update = { view ->
-                    view.player = exoPlayer
-                    view.resizeMode = resizeMode
+                    if (view.player !== exoPlayer) {
+                        view.player = exoPlayer
+                    }
+                    if (view.resizeMode != resizeMode) {
+                        view.resizeMode = resizeMode
+                    }
                 },
                 modifier = Modifier.fillMaxSize()
             )
@@ -1188,6 +1197,14 @@ private fun TrackPickerDialog(
     onSelectTrack: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val initialFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        delay(100)
+        try {
+            initialFocusRequester.requestFocus()
+        } catch (_: Exception) {}
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Color(0xFF1E2235),
@@ -1216,9 +1233,12 @@ private fun TrackPickerDialog(
                 } else {
                     items(tracks.size) { index ->
                         val (label, isSelected) = tracks[index]
+                        val isFirstOrSelected = isSelected || (index == 0 && tracks.none { it.second })
                         FocusCard(
                             onClick = { onSelectTrack(index) },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(if (isFirstOrSelected) Modifier.focusRequester(initialFocusRequester) else Modifier),
                             shape = RoundedCornerShape(8.dp)
                         ) { isFocused ->
                             Row(

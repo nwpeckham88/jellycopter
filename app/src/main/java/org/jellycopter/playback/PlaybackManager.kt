@@ -203,12 +203,41 @@ class PlaybackManager(
             )
         }
 
+        // Detect if server is already downmixing/transcoding to stereo to prevent double DRC
+        val isServerDownmixed = isServerDownmixedStream(uri)
+        setServerDownmixDetected(isServerDownmixed)
+
         // Apply audio settings to current adapter
         currentAdapter.setAudioNightMode(isNightModeActive, currentDrcConfig)
         currentAdapter.setForceStereo(isForceStereoActive, currentCenterBoostDb)
 
         currentAdapter.prepare(uri, startPositionMs)
         currentAdapter.play()
+    }
+
+    /**
+     * Updates downmixing routing and audio processors when server-side downmixing/DRC is detected.
+     */
+    fun setServerDownmixDetected(isDownmixed: Boolean) {
+        passthroughManager.setServerDownmixActive(isDownmixed)
+        (primaryPlayer as? ExoPlayerAdapter)?.audioProcessorChain?.isServerProcessingActive = isDownmixed
+    }
+
+    /**
+     * Determines whether the given media URI represents a server-transcoded / server-downmixed stream.
+     * In Jellyfin:
+     * - "static=true" indicates Direct Play / Direct Stream (the server serves bit-for-bit raw media without DRC or downmixing).
+     * - Streams without "static=true" or containing ".m3u8", "/transcode", or "AudioChannels=2" are transcoded by the server.
+     */
+    fun isServerDownmixedStream(uri: String?): Boolean {
+        if (uri == null) return false
+        val isStaticDirectPlay = uri.contains("static=true", ignoreCase = true)
+        val isTranscoded = !isStaticDirectPlay && (
+            uri.contains(".m3u8", ignoreCase = true) ||
+            uri.contains("/transcode", ignoreCase = true) ||
+            uri.contains("AudioChannels=2", ignoreCase = true)
+        )
+        return isTranscoded
     }
 
     override fun pause() {

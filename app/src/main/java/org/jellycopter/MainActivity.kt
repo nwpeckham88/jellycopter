@@ -54,6 +54,7 @@ import org.jellycopter.ui.screens.ShuffleChannelsScreen
 import org.jellycopter.ui.screens.TrophyRoomScreen
 import org.jellycopter.ui.theme.BaseThemeMode
 import org.jellycopter.ui.theme.JellycopterTheme
+import org.jellycopter.ui.viewmodel.MainViewModel
 import org.koin.android.ext.android.inject
 
 class MainActivity : ComponentActivity() {
@@ -140,14 +141,15 @@ fun JellycopterAppContent(
     val liveChannels by (resolvedChannelRepo?.getAllChannels()
         ?: kotlinx.coroutines.flow.flowOf(emptyList())).collectAsState(initial = emptyList())
 
-    // All available series for the channel editor picker (loads all folders then flattens)
+    // All available series for the channel editor picker (loads all folders then flattens on IO)
     val availableSeries by produceState<List<SeriesDetail>>(initialValue = emptyList(), resolvedMediaRepo) {
         if (resolvedMediaRepo != null) {
-            val folders = runCatching { resolvedMediaRepo.getVirtualFolders() }.getOrDefault(emptyList())
-            val all = folders.flatMap { folder ->
-                runCatching { resolvedMediaRepo.getSeriesInFolder(folder.id) }.getOrDefault(emptyList())
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val folders = runCatching { resolvedMediaRepo.getVirtualFolders() }.getOrDefault(emptyList())
+                folders.flatMap { folder ->
+                    runCatching { resolvedMediaRepo.getSeriesInFolder(folder.id) }.getOrDefault(emptyList())
+                }
             }
-            value = all
         }
     }
 
@@ -179,6 +181,9 @@ fun JellycopterAppContent(
     val deviceType = rememberDeviceType()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val mainViewModel = remember(resolvedChannelRepo, resolvedDeckRepo, resolvedMediaRepo, resolvedJellyseerrClient) {
+        MainViewModel(resolvedChannelRepo, resolvedDeckRepo, resolvedMediaRepo, resolvedJellyseerrClient)
+    }
 
     // Redirect to HOME if Discover disabled while on that tab
     if (!isDiscoverEnabled && currentScreen == NavScreen.DISCOVER) {
@@ -219,7 +224,7 @@ fun JellycopterAppContent(
                             mediaRepository = resolvedMediaRepo,
                             initialSeriesIds = editorState.preSelectedSeriesIds,
                             onSave = { entity ->
-                                scope.launch {
+                                mainViewModel.executeMutation {
                                     resolvedChannelRepo?.saveChannel(entity)
                                     val showIds = runCatching {
                                         json.decodeFromString<List<String>>(entity.showsJson)
@@ -251,7 +256,7 @@ fun JellycopterAppContent(
                             availableSeries = availableSeries,
                             mediaRepository = resolvedMediaRepo,
                             onSave = { entity ->
-                                scope.launch {
+                                mainViewModel.executeMutation {
                                     resolvedChannelRepo?.saveChannel(entity)
                                     val showIds = runCatching {
                                         json.decodeFromString<List<String>>(entity.showsJson)
@@ -274,7 +279,7 @@ fun JellycopterAppContent(
                                 channelEditorState = ChannelEditorState.Hidden
                             },
                             onDelete = { channelId ->
-                                scope.launch { resolvedChannelRepo?.deleteChannel(channelId) }
+                                mainViewModel.deleteChannel(channelId)
                                 channelEditorState = ChannelEditorState.Hidden
                             },
                             onCancel = { channelEditorState = ChannelEditorState.Hidden }
@@ -470,11 +475,21 @@ fun JellycopterAppContent(
                                             )
                                         }
                                     }
+                                },
+                                onOpenSeriesDetails = { seriesId ->
+                                    selectedSeriesId = seriesId
+                                },
+                                onNavigateToChannels = {
+                                    currentScreen = NavScreen.CHANNELS
+                                },
+                                onNavigateToLibrary = {
+                                    currentScreen = NavScreen.LIBRARY
                                 }
                             )
                             NavScreen.CHANNELS -> ShuffleChannelsScreen(
                                 liveChannels = liveChannels,
                                 mediaRepository = resolvedMediaRepo,
+                                availableSeries = availableSeries,
                                 onLaunchChannel = { channel ->
                                     scope.launch {
                                         val deckId = "channel:${channel.channelId}"
@@ -528,20 +543,15 @@ fun JellycopterAppContent(
                                 popular = popularItems,
                                 upcoming = upcomingItems,
                                 onRequestMedia = { item ->
-                                    scope.launch {
-                                        runCatching {
-                                            resolvedJellyseerrClient?.requestOneClick(
-                                                mediaId = item.tmdbId,
-                                                mediaType = item.mediaType,
-                                                title = item.title
-                                            )
-                                        }
-                                    }
+                                    mainViewModel.requestMedia(item)
                                 }
                             )
                             NavScreen.LIBRARY -> LibraryScreen(
                                 mediaRepository = resolvedMediaRepo,
-                                onOpenSeriesId = { selectedSeriesId = it }
+                                onOpenSeriesId = { selectedSeriesId = it },
+                                onRequestMissingSeason = { item, seasonNum ->
+                                    mainViewModel.requestMissingSeason(item.tmdbId, seasonNum)
+                                }
                             )
                             NavScreen.TROPHY_ROOM -> TrophyRoomScreen(
                                 achievements = achievements.ifEmpty {

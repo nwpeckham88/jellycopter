@@ -12,5 +12,6 @@ data class SeriesDetail(
     val communityRating: Float? = null,
     val premiereYear: Int? = null,
     val seasons: List<SeasonItem> = emptyList(),
-    val nextUpEpisode: EpisodeItem? = null
+    val nextUpEpisode: EpisodeItem? = null,
+    val tmdbId: Int? = null
 )

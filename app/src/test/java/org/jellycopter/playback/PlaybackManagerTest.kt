@@ -301,4 +301,47 @@ class PlaybackManagerTest {
         assertTrue(manager.isShufflePlayback)
         assertEquals(5000L, manager.playerState.value.positionMs)
     }
+
+    @Test
+    fun testDetectServerDownmixStream() {
+        val manager = PlaybackManager(ExoPlayerAdapter(), MpvPlayerAdapter())
+
+        // Direct Play with static=true is NOT server downmixed
+        assertFalse(manager.isServerDownmixedStream("http://192.168.2.4:8096/Videos/item123/stream?static=true"))
+
+        // HLS transcode or stream with AudioChannels=2 is server downmixed
+        assertTrue(manager.isServerDownmixedStream("http://192.168.2.4:8096/Videos/item123/stream.m3u8?AudioChannels=2"))
+        assertTrue(manager.isServerDownmixedStream("http://192.168.2.4:8096/Videos/item123/transcode/audio"))
+
+        // Null uri returns false
+        assertFalse(manager.isServerDownmixedStream(null))
+    }
+
+    @Test
+    fun testServerDownmixAutoBypassDSP() {
+        val primaryAdapter = ExoPlayerAdapter()
+        val passthrough = PassthroughHandoffManager()
+        val manager = PlaybackManager(primaryAdapter, MpvPlayerAdapter(), passthroughManager = passthrough)
+
+        // User turns Night Mode on
+        manager.setAudioNightMode(true, DrcConfig(enabled = true, vocalPeakingEqEnabled = true))
+        manager.setForceStereo(true, 3.0f)
+
+        // Verify initial state: DSP active
+        assertTrue(primaryAdapter.audioProcessorChain.drcFilter.config.enabled)
+        assertTrue(primaryAdapter.audioProcessorChain.downmixer.enabled)
+
+        // Server downmix is detected
+        manager.setServerDownmixDetected(true)
+
+        // Local downmixer and DRC must be bypassed to prevent double DRC
+        assertFalse(primaryAdapter.audioProcessorChain.drcFilter.config.enabled)
+        assertFalse(primaryAdapter.audioProcessorChain.downmixer.enabled)
+        assertEquals(PassthroughHandoffManager.AudioRoutingMode.PCM_DIRECT, passthrough.currentMode.value)
+
+        // When switching back to Direct Play (server downmix ceases)
+        manager.setServerDownmixDetected(false)
+        assertTrue(primaryAdapter.audioProcessorChain.drcFilter.config.enabled)
+        assertTrue(primaryAdapter.audioProcessorChain.downmixer.enabled)
+    }
 }

@@ -69,16 +69,20 @@ class JellycopterApplication : Application(), ImageLoaderFactory {
 
         return ImageLoader.Builder(this)
             .okHttpClient(imageOkHttp)
-            .crossfade(true)
+            .crossfade(150)
+            .allowHardware(true)
+            .allowRgb565(true)
+            .respectCacheHeaders(false)
             .memoryCache {
                 MemoryCache.Builder(this)
-                    .maxSizePercent(0.25)
+                    .maxSizePercent(0.30)
+                    .strongReferencesEnabled(true)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizePercent(0.05)
+                    .maxSizeBytes(250L * 1024 * 1024)
                     .build()
             }
             .build()

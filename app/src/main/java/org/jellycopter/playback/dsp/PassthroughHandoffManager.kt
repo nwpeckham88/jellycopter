@@ -41,6 +41,9 @@ class PassthroughHandoffManager(
     var isForceStereoEnabled: Boolean = false
         private set
 
+    var isServerDownmixActive: Boolean = false
+        private set
+
     var isPassthroughSupported: Boolean = initialPassthroughSupported
         private set
 
@@ -75,6 +78,13 @@ class PassthroughHandoffManager(
         }
     }
 
+    fun setServerDownmixActive(active: Boolean) {
+        if (isServerDownmixActive != active) {
+            isServerDownmixActive = active
+            evaluateRouting()
+        }
+    }
+
     fun setPassthroughSupported(supported: Boolean) {
         if (isPassthroughSupported != supported) {
             isPassthroughSupported = supported
@@ -92,6 +102,9 @@ class PassthroughHandoffManager(
     private fun evaluateRouting() {
         val oldMode = _currentMode.value
         val newMode = when {
+            isServerDownmixActive -> {
+                AudioRoutingMode.PCM_DIRECT
+            }
             isNightModeEnabled || isForceStereoEnabled -> {
                 AudioRoutingMode.PCM_DSP
             }

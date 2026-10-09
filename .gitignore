@@ -13,3 +13,5 @@
 .pytest_cache
 .agents
 *.compiler.options
+__pycache__/
+*.pyc

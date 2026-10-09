@@ -52,14 +52,16 @@ interface JellyfinApiService {
 
     @POST("Users/AuthenticateByName")
     suspend fun authenticateByName(
-        @Header("X-Emby-Authorization") authHeader: String,
+        @Header("X-Emby-Authorization") embyAuthHeader: String,
+        @Header("Authorization") authHeader: String,
         @Body request: AuthenticateByNameRequest
     ): Response<AuthenticateUserResult>
 
     @POST
     suspend fun authenticateByNameByUrl(
         @Url url: String,
-        @Header("X-Emby-Authorization") authHeader: String,
+        @Header("X-Emby-Authorization") embyAuthHeader: String,
+        @Header("Authorization") authHeader: String,
         @Body request: AuthenticateByNameRequest
     ): Response<AuthenticateUserResult>
 

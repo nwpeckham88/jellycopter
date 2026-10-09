@@ -57,6 +57,21 @@ class PaletteExtractorTest {
     }
 
     @Test
+    fun testLruCacheAndAsyncExtraction() = kotlinx.coroutines.test.runTest {
+        PaletteExtractor.cache.clear()
+        assertEquals(0, PaletteExtractor.cache.size())
+
+        val pixels = IntArray(100) { 0xFF6B21A8.toInt() }
+        val p1 = PaletteExtractor.extractFromPixelsAsync(pixels, 10, 10)
+        assertEquals(1, PaletteExtractor.cache.size())
+
+        // Second call should hit the in-memory LRU cache
+        val p2 = PaletteExtractor.extractFromPixels(pixels, 10, 10)
+        assertEquals(1, PaletteExtractor.cache.size())
+        assertEquals(p1, p2)
+    }
+
+    @Test
     fun testColorBlending() {
         val base = Color(1.0f, 0.0f, 0.0f, 1.0f) // Pure Red
         val overlay = Color(0.0f, 0.0f, 1.0f, 1.0f) // Pure Blue
@@ -81,8 +96,8 @@ class PaletteExtractorTest {
     fun testMasterBaseThemeDefaults() {
         // Warm Amber Dark
         val warm = JellycopterThemeDefaults.getBaseColors(BaseThemeMode.WARM_DARK)
-        assertEquals(Color(0xFF14110E), warm.background)
-        assertEquals(Color(0xFFF59E0B), warm.primaryAccent)
+        assertEquals(Color(0xFF0C0E14), warm.background)
+        assertEquals(Color(0xFFF5A623), warm.primaryAccent)
 
         // OLED Pure Black: 0x000000 background for pixel shutoff
         val oled = JellycopterThemeDefaults.getBaseColors(BaseThemeMode.OLED_PURE_BLACK)

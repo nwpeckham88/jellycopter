@@ -64,13 +64,16 @@ fun FocusCard(
     val borderStroke = if (isFocused) {
         BorderStroke(FocusEngine.BORDER_WIDTH_FOCUSED, JellycopterTheme.colors.borderGlow)
     } else {
-        BorderStroke(0.dp, Color.Transparent)
+        BorderStroke(1.dp, Color(0x18FFFFFF))
     }
+
+    val shadowAmbient = if (isFocused) Color(0x55000000) else Color(0x26000000)
+    val shadowSpot = if (isFocused) Color(0x99000000) else Color(0x33000000)
 
     Box(
         modifier = modifier
             .scale(animatedScale)
-            .shadow(currentElevation, shape, clip = false, ambientColor = JellycopterTheme.colors.ambientGlow, spotColor = JellycopterTheme.colors.primaryAccent)
+            .shadow(currentElevation, shape, clip = false, ambientColor = shadowAmbient, spotColor = shadowSpot)
             .clip(shape)
             .border(borderStroke, shape)
             .onFocusChanged { focusState ->
@@ -82,20 +85,20 @@ fun FocusCard(
             }
             .focusable(interactionSource = interactionSource)
             .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyUp) {
-                    when (keyEvent.key) {
-                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                when (keyEvent.key) {
+                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                        if (keyEvent.type == KeyEventType.KeyUp) {
                             onClick()
-                            true
                         }
-                        Key.Menu -> {
-                            onLongClick?.invoke()
-                            true
-                        }
-                        else -> false
+                        true
                     }
-                } else {
-                    false
+                    Key.Menu -> {
+                        if (keyEvent.type == KeyEventType.KeyUp) {
+                            onLongClick?.invoke()
+                        }
+                        true
+                    }
+                    else -> false
                 }
             }
             .combinedClickable(
@@ -112,7 +115,7 @@ fun FocusCard(
                 modifier = Modifier
                     .matchParentSize()
                     .clip(shape)
-                    .background(JellycopterTheme.colors.primaryAccent.copy(alpha = 0.08f))
+                    .background(Color.White.copy(alpha = 0.03f))
             )
         }
     }

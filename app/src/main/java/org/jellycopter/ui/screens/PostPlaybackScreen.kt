@@ -3,7 +3,9 @@ package org.jellycopter.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -60,6 +64,13 @@ fun PostPlaybackScreen(
     modifier: Modifier = Modifier
 ) {
     var timeLeft by remember { mutableIntStateOf(countdownSeconds) }
+    val playNextFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        try {
+            playNextFocusRequester.requestFocus()
+        } catch (_: Exception) {}
+    }
 
     LaunchedEffect(Unit) {
         while (timeLeft > 0) {
@@ -89,16 +100,19 @@ fun PostPlaybackScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 24.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .padding(bottom = 20.dp)
+                        .clip(RoundedCornerShape(12.dp))
                         .background(
                             Brush.horizontalGradient(
                                 colors = listOf(
-                                    Color(0xFFD97706),
-                                    Color(0xFFF59E0B),
-                                    Color(0xFFB45309)
+                                    Color(0xFF231D12),
+                                    Color(0xFF181611)
                                 )
                             )
+                        )
+                        .border(
+                            androidx.compose.foundation.BorderStroke(1.dp, Color(0x50F59E0B)),
+                            RoundedCornerShape(12.dp)
                         )
                         .padding(18.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -110,29 +124,29 @@ fun PostPlaybackScreen(
                         Icon(
                             imageVector = Icons.Rounded.EmojiEvents,
                             contentDescription = "Milestone Unlocked",
-                            modifier = Modifier.size(18.dp),
-                            tint = Color.Black
+                            modifier = Modifier.size(16.dp),
+                            tint = Color(0xFFFBBF24)
                         )
                         Text(
-                            text = "MILESTONE UNLOCKED!",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.Black,
-                            letterSpacing = 2.sp
+                            text = "MILESTONE UNLOCKED",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFBBF24),
+                            letterSpacing = 1.2.sp
                         )
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     unlockedMilestones.forEach { ach ->
                         Text(
-                            text = "${ach.title} • +${ach.points} Points (${ach.tier.name})",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Black,
+                            text = "${ach.title} • +${ach.points} PTS (${ach.tier.name})",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                         Text(
                             text = ach.description,
                             fontSize = 12.sp,
-                            color = Color(0xFFFEF3C7)
+                            color = Color(0xFFCBD5E1)
                         )
                     }
                 }
@@ -142,9 +156,13 @@ fun PostPlaybackScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(14.dp))
                     .background(JellycopterTheme.colors.surface)
-                    .padding(28.dp)
+                    .border(
+                        androidx.compose.foundation.BorderStroke(1.dp, Color(0x18FFFFFF)),
+                        RoundedCornerShape(14.dp)
+                    )
+                    .padding(26.dp)
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -152,15 +170,15 @@ fun PostPlaybackScreen(
                 ) {
                     Text(
                         text = "UP NEXT IN $timeLeft SECONDS",
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = JellycopterTheme.colors.primaryAccent,
-                        letterSpacing = 1.sp
+                        letterSpacing = 1.2.sp
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = nextEpisodeTitle,
-                        fontSize = 24.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -171,17 +189,18 @@ fun PostPlaybackScreen(
                         color = Color(0xFF94A3B8)
                     )
 
-                    Spacer(modifier = Modifier.height(28.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
                     // D-Pad Action Buttons
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         PostPlaybackActionButton(
                             text = "Play Next ($timeLeft)",
                             icon = Icons.Rounded.PlayArrow,
                             isPrimary = true,
+                            modifier = Modifier.focusRequester(playNextFocusRequester),
                             onClick = onPlayNext
                         )
 
@@ -219,28 +238,39 @@ private fun PostPlaybackActionButton(
     text: String,
     icon: ImageVector? = null,
     isPrimary: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     FocusCard(
+        modifier = modifier,
         onClick = onClick,
-        shape = RoundedCornerShape(10.dp)
+        shape = RoundedCornerShape(8.dp)
     ) { isFocused ->
         val bg = when {
-            isFocused -> JellycopterTheme.colors.primaryAccent
-            isPrimary -> JellycopterTheme.colors.surfaceVariant
-            else -> Color(0x33FFFFFF)
+            isFocused -> Color.White
+            isPrimary -> JellycopterTheme.colors.primaryAccent
+            else -> Color.White.copy(alpha = 0.08f)
         }
-        val textColor = if (isFocused) Color.White else Color(0xFFECEFF4)
+        val textColor = if (isFocused) Color.Black else Color.White
 
         Box(
             modifier = Modifier
                 .background(bg)
-                .padding(horizontal = 20.dp, vertical = 12.dp),
+                .border(
+                    width = 1.dp,
+                    color = when {
+                        isFocused -> Color.White
+                        isPrimary -> JellycopterTheme.colors.primaryAccent
+                        else -> Color(0x18FFFFFF)
+                    },
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .padding(horizontal = 18.dp, vertical = 10.dp),
             contentAlignment = Alignment.Center
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 if (icon != null) {
                     Icon(
@@ -253,8 +283,9 @@ private fun PostPlaybackActionButton(
                 Text(
                     text = text,
                     color = textColor,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.4.sp
                 )
             }
         }

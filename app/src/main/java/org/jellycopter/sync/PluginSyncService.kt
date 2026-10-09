@@ -11,6 +11,7 @@ import org.jellycopter.core.database.AchievementDao
 import org.jellycopter.core.database.AchievementEntity
 import org.jellycopter.core.database.DeckDao
 import org.jellycopter.core.database.DeckEntity
+import org.jellycopter.core.database.DeckProgressEntity
 import org.jellycopter.sync.model.AchievementSyncDto
 import org.jellycopter.sync.model.DeckSyncDto
 import org.jellycopter.sync.model.SyncResult
@@ -38,11 +39,18 @@ class PluginSyncService(
         isLenient = true
         encodeDefaults = true
         coerceInputValues = true
-    }
+    },
+    private val sessionProvider: (() -> org.jellycopter.core.session.UserSession?)? = null
 ) {
 
     private val _isPluginAvailable = MutableStateFlow<Boolean?>(null)
     val isPluginAvailable: StateFlow<Boolean?> = _isPluginAvailable.asStateFlow()
+
+    private val _serverAudioDrcActive = MutableStateFlow(false)
+    val serverAudioDrcActive: StateFlow<Boolean> = _serverAudioDrcActive.asStateFlow()
+
+    private val _serverDownmixAlgorithm = MutableStateFlow<String?>(null)
+    val serverDownmixAlgorithm: StateFlow<String?> = _serverDownmixAlgorithm.asStateFlow()
 
     /**
      * Probes the server for the Jellyfin Jellycopter companion plugin (/Jellycopter/Ping).
@@ -51,15 +59,22 @@ class PluginSyncService(
     suspend fun probePlugin(): Boolean {
         return try {
             val response = pluginApi.ping()
-            if (response.isSuccessful && response.body() != null) {
+            val body = response.body()
+            if (response.isSuccessful && body != null) {
                 _isPluginAvailable.value = true
+                _serverAudioDrcActive.value = body.serverAudioDrcActive
+                _serverDownmixAlgorithm.value = body.downmixAlgorithm
                 true
             } else {
                 _isPluginAvailable.value = false
+                _serverAudioDrcActive.value = false
+                _serverDownmixAlgorithm.value = null
                 false
             }
         } catch (e: Exception) {
             _isPluginAvailable.value = false
+            _serverAudioDrcActive.value = false
+            _serverDownmixAlgorithm.value = null
             false
         }
     }
@@ -83,12 +98,18 @@ class PluginSyncService(
             var syncedCount = 0
             for (local in localDecks) {
                 val exhaustedIds = parseJsonList(local.exhaustedCardIdsJson)
+                val progress = deckDao.getProgress(local.deckId)
+                val lastPlayedId = progress?.currentEpisodeId?.takeIf { it.isNotBlank() }
+                val lastTicks = (progress?.midwayResumeMs ?: 0L) * 10_000L
+
                 val dto = DeckSyncDto(
                     deckId = local.deckId,
                     seriesId = local.seriesId,
                     channelId = local.channelId,
                     cycleNumber = local.cycleNumber,
                     exhaustedItemIds = exhaustedIds,
+                    lastPlayedItemId = lastPlayedId,
+                    lastResumePositionTicks = lastTicks,
                     updatedAtUtc = formatIsoTimestamp(local.updatedAt)
                 )
 
@@ -104,6 +125,24 @@ class PluginSyncService(
                         updatedAt = System.currentTimeMillis()
                     )
                     deckDao.upsertDeck(updatedDeck)
+
+                    // If server deck provides resume position, synchronize progress
+                    if (!serverDeck.lastPlayedItemId.isNullOrBlank() && serverDeck.lastResumePositionTicks > 0) {
+                        val serverMs = serverDeck.lastResumePositionTicks / 10_000L
+                        if (progress == null || (serverMs > 0 && serverMs != progress.midwayResumeMs)) {
+                            deckDao.upsertProgress(
+                                DeckProgressEntity(
+                                    deckId = local.deckId,
+                                    currentCardId = serverDeck.lastPlayedItemId,
+                                    currentEpisodeId = serverDeck.lastPlayedItemId,
+                                    currentIndex = progress?.currentIndex ?: 0,
+                                    midwayResumeMs = serverMs,
+                                    durationMs = progress?.durationMs ?: 0L,
+                                    lastWatchedTimestamp = System.currentTimeMillis()
+                                )
+                            )
+                        }
+                    }
                     syncedCount++
                 }
             }
@@ -125,6 +164,20 @@ class PluginSyncService(
                             syncedAtUtc = currentIsoTimestamp()
                         )
                         deckDao.upsertDeck(newEntity)
+
+                        if (!r.lastPlayedItemId.isNullOrBlank() && r.lastResumePositionTicks > 0) {
+                            deckDao.upsertProgress(
+                                DeckProgressEntity(
+                                    deckId = r.deckId,
+                                    currentCardId = r.lastPlayedItemId,
+                                    currentEpisodeId = r.lastPlayedItemId,
+                                    currentIndex = 0,
+                                    midwayResumeMs = r.lastResumePositionTicks / 10_000L,
+                                    durationMs = 0L,
+                                    lastWatchedTimestamp = System.currentTimeMillis()
+                                )
+                            )
+                        }
                     }
                 }
             }
@@ -223,26 +276,11 @@ class PluginSyncService(
     }
 
     companion object {
-        fun create(
-            baseUrl: String,
+        fun createDynamic(
+            sessionProvider: () -> org.jellycopter.core.session.UserSession?,
             deckDao: DeckDao,
-            achievementDao: AchievementDao,
-            apiKey: String? = null
+            achievementDao: AchievementDao
         ): PluginSyncService {
-            val normalizedBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
-            val okHttpClientBuilder = OkHttpClient.Builder()
-                .connectTimeout(5, TimeUnit.SECONDS)
-                .readTimeout(5, TimeUnit.SECONDS)
-
-            if (!apiKey.isNullOrBlank()) {
-                okHttpClientBuilder.addInterceptor { chain ->
-                    val req = chain.request().newBuilder()
-                        .header("X-Emby-Token", apiKey)
-                        .build()
-                    chain.proceed(req)
-                }
-            }
-
             val json = Json {
                 ignoreUnknownKeys = true
                 isLenient = true
@@ -250,14 +288,46 @@ class PluginSyncService(
                 coerceInputValues = true
             }
 
+            val okHttpClient = OkHttpClient.Builder()
+                .connectTimeout(5, TimeUnit.SECONDS)
+                .readTimeout(5, TimeUnit.SECONDS)
+                .addInterceptor { chain ->
+                    val session = sessionProvider()
+                    val reqBuilder = chain.request().newBuilder()
+                    val token = session?.accessToken
+                    if (!token.isNullOrBlank()) {
+                        reqBuilder.header("X-Emby-Token", token)
+                        val authHeader = org.jellycopter.core.network.JellyfinApiService.buildEmbyAuthHeader(token = token)
+                        reqBuilder.header("X-Emby-Authorization", authHeader)
+                        reqBuilder.header("Authorization", authHeader)
+                    }
+
+                    // Dynamically rewrite base URL if session provides a different server URL
+                    val currentReq = reqBuilder.build()
+                    val sessionUrl = session?.serverUrl?.trim()?.removeSuffix("/")
+                    if (!sessionUrl.isNullOrBlank()) {
+                        val uri = runCatching { java.net.URI.create(sessionUrl) }.getOrNull()
+                        if (uri != null && uri.host != null) {
+                            val newUrl = currentReq.url.newBuilder()
+                                .scheme(uri.scheme ?: currentReq.url.scheme)
+                                .host(uri.host)
+                                .port(if (uri.port != -1) uri.port else if (uri.scheme == "https") 443 else 80)
+                                .build()
+                            return@addInterceptor chain.proceed(currentReq.newBuilder().url(newUrl).build())
+                        }
+                    }
+                    chain.proceed(currentReq)
+                }
+                .build()
+
             val retrofit = Retrofit.Builder()
-                .baseUrl(normalizedBaseUrl)
-                .client(okHttpClientBuilder.build())
+                .baseUrl("http://localhost:8096/")
+                .client(okHttpClient)
                 .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
                 .build()
 
             val api = retrofit.create(PluginSyncApi::class.java)
-            return PluginSyncService(api, deckDao, achievementDao, json)
+            return PluginSyncService(api, deckDao, achievementDao, json, sessionProvider)
         }
     }
 }

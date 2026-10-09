@@ -124,6 +124,7 @@ class AuthRepositoryTest {
             apiService.authenticateByNameByUrl(
                 "http://jellyfin.home:8096/Users/AuthenticateByName",
                 any(),
+                any(),
                 AuthenticateByNameRequest(username = "Nathan", pw = "secret123")
             )
         } returns Response.success(authResult)
@@ -159,7 +160,7 @@ class AuthRepositoryTest {
             """{"message": "Invalid username or password"}""".toResponseBody("application/json".toMediaType())
         )
         coEvery {
-            apiService.authenticateByNameByUrl(any(), any(), any())
+            apiService.authenticateByNameByUrl(any(), any(), any(), any())
         } returns errorResponse
 
         val result = repository.authenticate("http://jellyfin.home:8096", "baduser", "wrongpassword")
@@ -183,7 +184,7 @@ class AuthRepositoryTest {
             accessToken = null
         )
         coEvery {
-            apiService.authenticateByNameByUrl(any(), any(), any())
+            apiService.authenticateByNameByUrl(any(), any(), any(), any())
         } returns Response.success(malformedResult)
 
         val result = repository.authenticate("http://server:8096", "user", "pass")

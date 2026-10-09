@@ -114,7 +114,22 @@ val repositoryModule = module {
 }
 
 val viewModelModule = module {
-    // ViewModels for authentication, settings, and library screens
+    viewModel { org.jellycopter.ui.viewmodel.LoginViewModel(authRepository = getOrNull()) }
+    viewModel {
+        org.jellycopter.ui.viewmodel.SettingsViewModel(
+            settingsRepository = getOrNull(),
+            authRepository = getOrNull(),
+            pluginSyncService = getOrNull()
+        )
+    }
+    viewModel {
+        org.jellycopter.ui.viewmodel.MainViewModel(
+            channelRepository = getOrNull(),
+            deckRepository = getOrNull(),
+            mediaRepository = getOrNull(),
+            jellyseerrClient = getOrNull()
+        )
+    }
 }
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
@@ -158,21 +173,20 @@ val playbackModule = module {
         )
     }
     single {
-        val session = getOrNull<EncryptedSessionStorage>()?.getSession()
-        val serverUrl = session?.serverUrl ?: "http://localhost:8096"
-        val apiKey = session?.accessToken
-        org.jellycopter.sync.PluginSyncService.create(
-            baseUrl = serverUrl,
+        val storage = getOrNull<EncryptedSessionStorage>()
+        org.jellycopter.sync.PluginSyncService.createDynamic(
+            sessionProvider = { storage?.getSession() },
             deckDao = get(),
-            achievementDao = get(),
-            apiKey = apiKey
+            achievementDao = get()
         )
     }
     single {
         val settingsRepo = getOrNull<SettingsRepository>()
-        val url = settingsRepo?.getJellyseerrUrl()
-        org.jellycopter.discovery.JellyseerrClient.create(
-            baseUrl = if (!url.isNullOrBlank()) url else "http://localhost:5055"
+        org.jellycopter.discovery.JellyseerrClient.createDynamic(
+            urlProvider = {
+                val url = settingsRepo?.getJellyseerrUrl()
+                if (!url.isNullOrBlank()) url else "http://localhost:5055"
+            }
         )
     }
 }
