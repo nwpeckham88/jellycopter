@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -68,6 +69,7 @@ import org.jellycopter.ui.theme.JellycopterTheme
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.random.Random
 
 /**
  * Applies horizontal CRT scanlines across any composable container.
@@ -91,8 +93,8 @@ fun Modifier.crtScanlines(
 
 /**
  * 4:3 CRT Picture Tube Bezel:
- * Curved glass tube with rounded corners, inner cathode ray vignette shadow,
- * subtle glass reflection glare, and phosphor scanlines.
+ * Curved glass tube with rounded corners (22.dp default), inner cathode ray vignette shadow,
+ * subtle glass reflection glare curve, and phosphor scanlines.
  */
 @Composable
 fun CrtScreenTube(
@@ -135,7 +137,7 @@ fun CrtScreenTube(
             content()
         }
 
-        // Inner Cathode Ray Vignette Shadow (darker around edges & corners)
+        // Inner Cathode Ray Vignette Shadow (darker around edges & corners) + Glass Glare
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -154,7 +156,25 @@ fun CrtScreenTube(
                         )
                     )
 
-                    // Subtle top-left glass glare curve
+                    // Subtle top glass glare curve
+                    drawArc(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color(0x22FFFFFF),
+                                Color(0x0AFFFFFF),
+                                Color.Transparent
+                            )
+                        ),
+                        startAngle = 200f,
+                        sweepAngle = 140f,
+                        useCenter = false,
+                        topLeft = Offset(size.width * 0.08f, 4f),
+                        size = Size(size.width * 0.84f, size.height * 0.35f),
+                        style = Stroke(width = 2.0f)
+                    )
+
+                    // Subtle top-left glass glare accent line
                     drawLine(
                         brush = Brush.horizontalGradient(
                             colors = listOf(
@@ -174,9 +194,483 @@ fun CrtScreenTube(
 }
 
 /**
+ * Looping animated CRT analog static noise / snow in Compose.
+ * Uses Canvas with random noise pixels, gray shades, subtle jitter, and rolling vertical hold
+ * for unprogrammed channels and channel switching.
+ * Includes an on-screen prompt '[PRESS ENTER TO PROGRAM CHANNEL]' when channel is unprogrammed.
+ */
+@Composable
+fun AnalogStaticSnow(
+    modifier: Modifier = Modifier,
+    isUnprogrammed: Boolean = false,
+    channelNumber: Int? = null,
+    onProgramChannel: (() -> Unit)? = null,
+    promptText: String = "[PRESS ENTER TO PROGRAM CHANNEL]"
+) {
+    var noiseTick by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(33L) // ~30 fps analog static noise refresh rate
+            noiseTick = (noiseTick + 1) % 10000
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .background(Color(0xFF0D0F12))
+            .fillMaxSize()
+    ) {
+        // CRT Analog Noise Canvas
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .crtScanlines(lineSpacingPx = 4f, lineAlpha = 0.22f)
+        ) {
+            val rng = Random(noiseTick)
+            val w = size.width
+            val h = size.height
+
+            // Random noise specks across the screen
+            val numSpecks = 260
+            for (i in 0 until numSpecks) {
+                val x = rng.nextFloat() * w
+                val y = rng.nextFloat() * h
+                val speckW = rng.nextFloat() * 5f + 1.5f
+                val speckH = rng.nextFloat() * 2.5f + 1f
+                val alpha = rng.nextFloat() * 0.75f + 0.25f
+                val shade = rng.nextInt(4)
+                val speckColor = when (shade) {
+                    0 -> Color.White.copy(alpha = alpha)
+                    1 -> Color(0xFFD0D5DD).copy(alpha = alpha)
+                    2 -> Color(0xFF98A2B3).copy(alpha = alpha)
+                    else -> Color(0xFF475467).copy(alpha = alpha)
+                }
+                drawRect(
+                    color = speckColor,
+                    topLeft = Offset(x, y),
+                    size = Size(speckW, speckH)
+                )
+            }
+
+            // Horizontal static jitter bands (simulating analog sync jitter)
+            val numBands = 5
+            for (i in 0 until numBands) {
+                val bandY = rng.nextFloat() * h
+                val bandH = rng.nextFloat() * 4f + 1.5f
+                val bandAlpha = rng.nextFloat() * 0.20f + 0.05f
+                drawRect(
+                    color = Color.White.copy(alpha = bandAlpha),
+                    topLeft = Offset(0f, bandY),
+                    size = Size(w, bandH)
+                )
+            }
+
+            // Rolling vertical hold sync bar
+            val rollProgress = (noiseTick % 100) / 100f
+            val rollY = rollProgress * h
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color(0x20000000),
+                        Color(0x35FFFFFF),
+                        Color(0x20000000),
+                        Color.Transparent
+                    ),
+                    startY = rollY - 35f,
+                    endY = rollY + 35f
+                ),
+                topLeft = Offset(0f, (rollY - 35f).coerceAtLeast(0f)),
+                size = Size(w, 70f)
+            )
+        }
+
+        // CRT Cathode Ray vignette over static noise
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .drawBehind {
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color(0x1A000000),
+                                Color(0x55000000),
+                                Color(0xAA000000)
+                            ),
+                            center = Offset(size.width / 2f, size.height / 2f),
+                            radius = size.width.coerceAtLeast(size.height) * 0.72f
+                        )
+                    )
+                }
+        )
+
+        // On-screen OSD prompt when channel is unprogrammed
+        if (isUnprogrammed) {
+            var isFocused by remember { mutableStateOf(false) }
+            var blinkVisible by remember { mutableStateOf(true) }
+
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(550L)
+                    blinkVisible = !blinkVisible
+                }
+            }
+
+            val interactionSource = remember { MutableInteractionSource() }
+
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xE60A0E14))
+                        .border(
+                            BorderStroke(
+                                width = if (isFocused) 2.dp else 1.5.dp,
+                                color = if (isFocused) Color(0xFFFFD54F) else Color(0xFF10B981)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .onFocusChanged { isFocused = it.isFocused }
+                        .focusable(interactionSource = interactionSource)
+                        .onKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyUp) {
+                                when (keyEvent.key) {
+                                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                        RetroAudioEffects.playKnobClick()
+                                        onProgramChannel?.invoke()
+                                        true
+                                    }
+                                    else -> false
+                                }
+                            } else false
+                        }
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = {
+                                RetroAudioEffects.playKnobClick()
+                                onProgramChannel?.invoke()
+                            }
+                        )
+                        .padding(horizontal = 24.dp, vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    val chLabel = if (channelNumber != null) "CH 0$channelNumber • " else ""
+                    Text(
+                        text = "${chLabel}NO BROADCAST SIGNAL",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.5.sp,
+                        color = Color(0xFFEF4444)
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = promptText,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.sp,
+                        color = if (blinkVisible) Color(0xFF34D399) else Color(0xFF065F46),
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "TUNER UNCONFIGURED • SELECT SOURCE TO ASSIGN",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = FontFamily.Monospace,
+                        color = Color(0xFF94A3B8),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Authentic 1970s/1980s retro SMPTE color bar / broadcast test slate showing station callsign
+ * ('[WJEL-TV CH 03]'), channel title, show title, 'PLEASE STAND BY / BROADCAST RETRIEVING'
+ * countdown/loading bar, and retro typography.
+ */
+@Composable
+fun BroadcastSlateCard(
+    modifier: Modifier = Modifier,
+    stationCallsign: String = "[WJEL-TV CH 03]",
+    channelTitle: String = "CHANNEL 03 BROADCAST",
+    showTitle: String = "SIGNAL ACQUISITION IN PROGRESS",
+    statusText: String = "PLEASE STAND BY / BROADCAST RETRIEVING",
+    progressFraction: Float? = null,
+    scanlinesEnabled: Boolean = true
+) {
+    var animProgress by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(40L)
+            animProgress = (animProgress + 0.012f) % 1.0f
+        }
+    }
+
+    val activeProgress = progressFraction ?: animProgress
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFF0F172A))
+    ) {
+        // SMPTE / EIA Color Bars Canvas
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+
+            // 1. Top Section (68% height): 7 primary SMPTE bars
+            val topH = h * 0.68f
+            val barW = w / 7f
+            val topColors = listOf(
+                Color(0xFFC0C0C0), // 75% Gray / White
+                Color(0xFFC0C000), // Yellow
+                Color(0xFF00C0C0), // Cyan
+                Color(0xFF00C000), // Green
+                Color(0xFFC000C0), // Magenta
+                Color(0xFFC00000), // Red
+                Color(0xFF0000C0)  // Blue
+            )
+            topColors.forEachIndexed { i, col ->
+                drawRect(
+                    color = col,
+                    topLeft = Offset(i * barW, 0f),
+                    size = Size(barW + 1f, topH)
+                )
+            }
+
+            // 2. Middle Section (8% height): Castellation transition bars
+            val midH = h * 0.08f
+            val midColors = listOf(
+                Color(0xFF0000C0), // Blue
+                Color(0xFF131313), // Black
+                Color(0xFFC000C0), // Magenta
+                Color(0xFF131313), // Black
+                Color(0xFF00C0C0), // Cyan
+                Color(0xFF131313), // Black
+                Color(0xFFC0C0C0)  // Gray
+            )
+            midColors.forEachIndexed { i, col ->
+                drawRect(
+                    color = col,
+                    topLeft = Offset(i * barW, topH),
+                    size = Size(barW + 1f, midH)
+                )
+            }
+
+            // 3. Bottom Section (24% height): In-phase, 100% white, Quadrature, PLUGE
+            val botH = h * 0.24f
+            val botY = topH + midH
+            val botBlockW = w / 6f
+            val botColors = listOf(
+                Color(0xFF002147), // -I (In-phase navy)
+                Color(0xFFFFFFFF), // 100% White
+                Color(0xFF32006A), // +Q (Quadrature violet)
+                Color(0xFF131313), // Black
+                Color(0xFF0A0A0A), // PLUGE sub-black
+                Color(0xFF131313)  // Black
+            )
+            botColors.forEachIndexed { i, col ->
+                drawRect(
+                    color = col,
+                    topLeft = Offset(i * botBlockW, botY),
+                    size = Size(botBlockW + 1f, botH)
+                )
+            }
+        }
+
+        // Cathode Ray Vignette Shadow
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .drawBehind {
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color(0x15000000),
+                                Color(0x45000000),
+                                Color(0x85000000)
+                            ),
+                            center = Offset(size.width / 2f, size.height / 2f),
+                            radius = size.width.coerceAtLeast(size.height) * 0.75f
+                        )
+                    )
+                }
+        )
+
+        // Center Broadcast Slate Placard Card
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xF20A0C10))
+                    .border(
+                        BorderStroke(
+                            2.5.dp,
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    Color(0xFFFFDF7A),
+                                    Color(0xFFD4AF37),
+                                    Color(0xFF8B6914),
+                                    Color(0xFFD4AF37)
+                                )
+                            )
+                        ),
+                        RoundedCornerShape(8.dp)
+                    )
+                    .border(BorderStroke(1.dp, Color(0x80000000)), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 28.dp, vertical = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Station Callsign Header
+                Text(
+                    text = stationCallsign,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 2.sp,
+                    color = Color(0xFFFFD54F)
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Channel Title
+                Text(
+                    text = channelTitle.uppercase(),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.2.sp,
+                    color = Color(0xFFF1F5F9),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                // Show / Program Title
+                Text(
+                    text = showTitle,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = FontFamily.Monospace,
+                    color = Color(0xFF94A3B8),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Brass Accent Pinstripe Divider
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .height(1.5.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color(0xFFD4AF37),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Status Text
+                Text(
+                    text = statusText,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.2.sp,
+                    color = Color(0xFF34D399)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Retro Segmented Countdown / Loading Bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Color(0xFF05120B))
+                        .border(BorderStroke(1.dp, Color(0xFF1B3D28)), RoundedCornerShape(3.dp))
+                        .padding(horizontal = 3.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val segmentCount = 18
+                    val litSegments = (activeProgress * segmentCount).toInt().coerceIn(0, segmentCount)
+                    for (i in 0 until segmentCount) {
+                        val isLit = i < litSegments
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(1.dp))
+                                .background(
+                                    if (isLit) {
+                                        if (i >= segmentCount - 3) Color(0xFFFFB300) else Color(0xFF34D399)
+                                    } else {
+                                        Color(0xFF0F2618)
+                                    }
+                                )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Calibration Metadata Footer
+                Text(
+                    text = "SMPTE-170M COLOR ALIGNMENT • 1000 Hz 0 dB REF • NTSC 525",
+                    fontSize = 7.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 0.8.sp,
+                    color = Color(0x99A0AEC0)
+                )
+            }
+        }
+
+        // CRT Scanline Overlay
+        if (scanlinesEnabled) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .crtScanlines(lineSpacingPx = 4f, lineAlpha = 0.20f)
+            )
+        }
+    }
+}
+
+/**
  * Authentic Vintage Rotary VHF Channel Selector Dial:
  * Physical knob with channel numbers (2..13) that rotates with animated spring physics
- * when channel selection changes.
+ * when channel selection changes. Includes indicator arrow, brass center cap, and D-pad interaction.
  */
 @Composable
 fun RotaryChannelDial(
@@ -188,7 +682,7 @@ fun RotaryChannelDial(
     var isFocused by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
 
-    // Channel 2 is 0 degrees, each channel advances by 30 degrees (12 channels around dial)
+    // Channel 2 is 0 degrees, each channel advances by 30 degrees (12 channels around dial: 2..13)
     val targetAngle = ((selectedChannel - 2) * 30f) % 360f
 
     val animatedAngle by animateFloatAsState(
@@ -218,19 +712,36 @@ fun RotaryChannelDial(
                 if (keyEvent.type == KeyEventType.KeyUp) {
                     when (keyEvent.key) {
                         Key.DirectionRight, Key.DirectionDown -> {
-                            val next = if (selectedChannel >= 7) 2 else selectedChannel + 1
+                            val next = if (selectedChannel >= 13) 2 else selectedChannel + 1
+                            RetroAudioEffects.playKnobClick()
                             onChannelSelected(next)
                             true
                         }
                         Key.DirectionLeft, Key.DirectionUp -> {
-                            val prev = if (selectedChannel <= 2) 7 else selectedChannel - 1
+                            val prev = if (selectedChannel <= 2) 13 else selectedChannel - 1
+                            RetroAudioEffects.playKnobClick()
                             onChannelSelected(prev)
+                            true
+                        }
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                            val next = if (selectedChannel >= 13) 2 else selectedChannel + 1
+                            RetroAudioEffects.playKnobClick()
+                            onChannelSelected(next)
                             true
                         }
                         else -> false
                     }
                 } else false
-            },
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {
+                    val next = if (selectedChannel >= 13) 2 else selectedChannel + 1
+                    RetroAudioEffects.playKnobClick()
+                    onChannelSelected(next)
+                }
+            ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Label Header
@@ -261,7 +772,7 @@ fun RotaryChannelDial(
                 .border(BorderStroke(2.dp, Color(0xFFD4AF37)), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            // Channel Numbers Dial Ring (Stationary plate)
+            // Channel Numbers Dial Ring (Stationary plate with channels 2..13)
             Canvas(modifier = Modifier.fillMaxSize().padding(6.dp)) {
                 val radius = size.minDimension / 2f
                 val center = Offset(size.width / 2f, size.height / 2f)
@@ -323,9 +834,28 @@ fun RotaryChannelDial(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = 2.dp)
-                        .size(4.dp)
+                        .size(5.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFFFB300))
+                        .border(BorderStroke(0.8.dp, Color(0xFFB8860B)), CircleShape)
+                )
+
+                // Brass Center Cap
+                Box(
+                    modifier = Modifier
+                        .size(dialSize * 0.22f)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    Color(0xFFFFDF7A), // Polished brass center highlight
+                                    Color(0xFFD4AF37), // Antique gold
+                                    Color(0xFF8B6914), // Deep brass tone
+                                    Color(0xFF4A3510)  // Dark rim
+                                )
+                            )
+                        )
+                        .border(BorderStroke(1.dp, Color(0xFF6B4E23)), CircleShape)
                 )
             }
         }
@@ -586,6 +1116,7 @@ fun TactilePushButton(
                 if (keyEvent.type == KeyEventType.KeyUp) {
                     when (keyEvent.key) {
                         Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                            RetroAudioEffects.playKnobClick()
                             onClick()
                             true
                         }
@@ -596,7 +1127,10 @@ fun TactilePushButton(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onClick
+                onClick = {
+                    RetroAudioEffects.playKnobClick()
+                    onClick()
+                }
             )
             .padding(horizontal = 10.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center
@@ -713,6 +1247,95 @@ fun SpeakerGrille(
                 letterSpacing = 1.sp,
                 color = Color(0xFF1A1208)
             )
+        }
+    }
+}
+
+/**
+ * Vintage 1978 Woodgrain TV Console Cabinet Frame:
+ * Full 16:9 woodgrain cabinet border with rich walnut texture,
+ * chamfered cabinet beveling, and metallic brass inlay pinstriping.
+ */
+@Composable
+fun CabinetFrame(
+    modifier: Modifier = Modifier,
+    bezelThickness: Dp = 16.dp,
+    content: @Composable BoxScope.() -> Unit
+) {
+    Box(
+        modifier = modifier
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF3A2012), // Warm walnut top rail
+                        Color(0xFF28140A), // Deep wood grain
+                        Color(0xFF452616), // Highlight plank
+                        Color(0xFF231208), // Dark shadow
+                        Color(0xFF180A04)  // Bottom rail
+                    )
+                )
+            )
+            .drawBehind {
+                // Walnut wood grain fine striations
+                val grainSpacing = 4f
+                val numGrains = (size.height / grainSpacing).toInt()
+                for (i in 0 until numGrains step 2) {
+                    val y = i * grainSpacing
+                    val alpha = if (i % 6 == 0) 0.08f else 0.035f
+                    drawLine(
+                        color = Color(0xFF6B3A1C).copy(alpha = alpha),
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = 1f
+                    )
+                }
+
+                // 3D Outer Cabinet Bevel: Top rim highlight, bottom rim shadow
+                drawLine(
+                    color = Color(0x33FFFFFF),
+                    start = Offset(0f, 1f),
+                    end = Offset(size.width, 1f),
+                    strokeWidth = 2f
+                )
+                drawLine(
+                    color = Color(0x88000000),
+                    start = Offset(0f, size.height - 1f),
+                    end = Offset(size.width, size.height - 1f),
+                    strokeWidth = 2f
+                )
+            }
+            // 3D Cabinet outer rim border
+            .border(
+                BorderStroke(2.dp, Color(0xFF150A04)),
+                RoundedCornerShape(12.dp)
+            )
+            .padding(bezelThickness)
+    ) {
+        // Brass Inlay Pinstriping surrounding the screen and control fascia
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .border(
+                    BorderStroke(
+                        width = 1.8.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFFFFDF7A), // Inlaid brass highlight
+                                Color(0xFFD4AF37), // Antique brass
+                                Color(0xFF8B6914), // Burnished shadow
+                                Color(0xFFD4AF37)
+                            )
+                        )
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                )
+                .border(
+                    BorderStroke(1.dp, Color(0x66000000)),
+                    shape = RoundedCornerShape(10.dp)
+                )
+                .padding(4.dp)
+        ) {
+            content()
         }
     }
 }

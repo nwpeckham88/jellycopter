@@ -134,13 +134,16 @@ object RetroAudioEffects {
             .setTransferMode(AudioTrack.MODE_STATIC)
             .build()
 
-        audioTrack.write(samples, 0, samples.size)
-        audioTrack.play()
+        try {
+            audioTrack.write(samples, 0, samples.size)
+            audioTrack.play()
 
-        // Release track after playback completes
-        val sleepMs = ((samples.size.toDouble() / sampleRate) * 1000.0).toLong() + 50L
-        Thread.sleep(sleepMs)
-        audioTrack.stop()
-        audioTrack.release()
+            // Release track after playback completes
+            val sleepMs = ((samples.size.toDouble() / sampleRate) * 1000.0).toLong() + 50L
+            Thread.sleep(sleepMs)
+            audioTrack.stop()
+        } finally {
+            audioTrack.release()
+        }
     }
 }
