@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AchievementEntity::class,
         ChannelEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class JellycopterDatabase : RoomDatabase() {
@@ -62,6 +62,12 @@ abstract class JellycopterDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `channels` ADD COLUMN `channelNumber` INTEGER NOT NULL DEFAULT 3")
+            }
+        }
+
         fun getDatabase(context: Context): JellycopterDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -69,7 +75,7 @@ abstract class JellycopterDatabase : RoomDatabase() {
                     JellycopterDatabase::class.java,
                     "jellycopter.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

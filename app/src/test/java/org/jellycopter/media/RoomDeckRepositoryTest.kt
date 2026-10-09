@@ -122,4 +122,22 @@ class RoomDeckRepositoryTest {
             )
         }
     }
+
+    @Test
+    fun testChannelEntityDefaultChannelNumber() {
+        val channel = org.jellycopter.core.database.ChannelEntity(
+            channelId = "ch_test",
+            name = "Retro Toons"
+        )
+        assertEquals(3, channel.channelNumber)
+    }
+
+    @Test
+    fun testMigration2To3ExecutesAlterTableAddChannelNumber() {
+        val db = mockk<androidx.sqlite.db.SupportSQLiteDatabase>(relaxed = true)
+        org.jellycopter.core.database.JellycopterDatabase.MIGRATION_2_3.migrate(db)
+        io.mockk.verify {
+            db.execSQL("ALTER TABLE `channels` ADD COLUMN `channelNumber` INTEGER NOT NULL DEFAULT 3")
+        }
+    }
 }
