@@ -1043,8 +1043,13 @@ fun VfdChannelDisplay(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                val chText = when {
+                    channelNumber <= 0 -> "AUX"
+                    channelNumber < 10 -> "CH 0$channelNumber"
+                    else -> "CH $channelNumber"
+                }
                 Text(
-                    text = "CH 0$channelNumber",
+                    text = chText,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Black,
                     fontFamily = FontFamily.Monospace,

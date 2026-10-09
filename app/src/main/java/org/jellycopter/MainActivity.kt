@@ -83,7 +83,10 @@ class MainActivity : ComponentActivity() {
 /** Sealed state for the channel editor overlay */
 sealed interface ChannelEditorState {
     object Hidden : ChannelEditorState
-    data class CreatingNew(val preSelectedSeriesIds: List<String> = emptyList()) : ChannelEditorState
+    data class CreatingNew(
+        val preSelectedSeriesIds: List<String> = emptyList(),
+        val preSelectedChannelNumber: Int? = null
+    ) : ChannelEditorState
     data class Editing(val channel: ChannelEntity) : ChannelEditorState
 }
 
@@ -185,6 +188,52 @@ fun JellycopterAppContent(
         MainViewModel(resolvedChannelRepo, resolvedDeckRepo, resolvedMediaRepo, resolvedJellyseerrClient)
     }
 
+    val launchChannelPlayback: (ChannelEntity) -> Unit = { channel ->
+        scope.launch {
+            val deckId = "channel:${channel.channelId}"
+            var deck = resolvedDeckRepo?.getDeck(deckId)
+            if (deck == null || deck.cards.isEmpty()) {
+                val showIds = runCatching {
+                    json.decodeFromString<List<String>>(channel.showsJson)
+                }.getOrDefault(emptyList())
+                if (showIds.isNotEmpty()) {
+                    val showConfigs = showIds.map { ShowConfig(seriesId = it, seriesName = it) }
+                    val showEpisodesMap = showIds.associateWith { seriesId ->
+                        resolvedMediaRepo?.getAllEpisodesForSeries(seriesId) ?: emptyList()
+                    }
+                    deck = resolvedShuffleEngine?.generateMixChannelDeck(
+                        channelId = channel.channelId,
+                        shows = showConfigs,
+                        episodeProvider = { seriesId -> showEpisodesMap[seriesId] ?: emptyList() }
+                    )
+                    if (deck != null) {
+                        resolvedDeckRepo?.saveDeck(deck)
+                    }
+                }
+            }
+
+            val card = deck?.currentCard ?: deck?.cards?.firstOrNull()
+            val ep = card?.items?.firstOrNull()
+            if (ep != null) {
+                val resumePos = when (channel.resumeBehavior) {
+                    "BEGINNING" -> 0L
+                    "EXACT_POSITION" -> deck?.midwayResumeMs ?: 0L
+                    else -> 0L
+                }
+                context.startActivity(
+                    PlaybackActivity.buildIntent(
+                        context = context,
+                        episode = ep,
+                        source = CoordinatorSource.CHANNEL,
+                        channelId = channel.channelId,
+                        deckId = deckId,
+                        startPositionMs = resumePos
+                    )
+                )
+            }
+        }
+    }
+
     // Redirect to HOME if Discover disabled while on that tab
     if (!isDiscoverEnabled && currentScreen == NavScreen.DISCOVER) {
         currentScreen = NavScreen.HOME
@@ -223,6 +272,8 @@ fun JellycopterAppContent(
                             availableSeries = availableSeries,
                             mediaRepository = resolvedMediaRepo,
                             initialSeriesIds = editorState.preSelectedSeriesIds,
+                            initialChannelNumber = editorState.preSelectedChannelNumber,
+                            existingChannels = liveChannels,
                             onSave = { entity ->
                                 mainViewModel.executeMutation {
                                     resolvedChannelRepo?.saveChannel(entity)
@@ -255,6 +306,7 @@ fun JellycopterAppContent(
                             existingChannel = editorState.channel,
                             availableSeries = availableSeries,
                             mediaRepository = resolvedMediaRepo,
+                            existingChannels = liveChannels,
                             onSave = { entity ->
                                 mainViewModel.executeMutation {
                                     resolvedChannelRepo?.saveChannel(entity)
@@ -386,7 +438,12 @@ fun JellycopterAppContent(
                         deviceType = deviceType,
                         currentScreen = currentScreen,
                         onScreenSelected = { currentScreen = it },
-                        isDiscoverEnabled = isDiscoverEnabled
+                        isDiscoverEnabled = isDiscoverEnabled,
+                        liveChannels = liveChannels,
+                        onTuneSmartChannel = launchChannelPlayback,
+                        onCreateSmartChannelAt = { chNum ->
+                            channelEditorState = ChannelEditorState.CreatingNew(preSelectedChannelNumber = chNum)
+                        }
                     ) {
                         when (currentScreen) {
                             NavScreen.HOME -> HomeScreen(
@@ -490,51 +547,7 @@ fun JellycopterAppContent(
                                 liveChannels = liveChannels,
                                 mediaRepository = resolvedMediaRepo,
                                 availableSeries = availableSeries,
-                                onLaunchChannel = { channel ->
-                                    scope.launch {
-                                        val deckId = "channel:${channel.channelId}"
-                                        var deck = resolvedDeckRepo?.getDeck(deckId)
-                                        if (deck == null || deck.cards.isEmpty()) {
-                                            val showIds = runCatching {
-                                                json.decodeFromString<List<String>>(channel.showsJson)
-                                            }.getOrDefault(emptyList())
-                                            if (showIds.isNotEmpty()) {
-                                                val showConfigs = showIds.map { ShowConfig(seriesId = it, seriesName = it) }
-                                                val showEpisodesMap = showIds.associateWith { seriesId ->
-                                                    resolvedMediaRepo?.getAllEpisodesForSeries(seriesId) ?: emptyList()
-                                                }
-                                                deck = resolvedShuffleEngine?.generateMixChannelDeck(
-                                                    channelId = channel.channelId,
-                                                    shows = showConfigs,
-                                                    episodeProvider = { seriesId -> showEpisodesMap[seriesId] ?: emptyList() }
-                                                )
-                                                if (deck != null) {
-                                                    resolvedDeckRepo?.saveDeck(deck)
-                                                }
-                                            }
-                                        }
-
-                                        val card = deck?.currentCard ?: deck?.cards?.firstOrNull()
-                                        val ep = card?.items?.firstOrNull()
-                                        if (ep != null) {
-                                            val resumePos = when (channel.resumeBehavior) {
-                                                "BEGINNING" -> 0L
-                                                "EXACT_POSITION" -> deck?.midwayResumeMs ?: 0L
-                                                else -> 0L
-                                            }
-                                            context.startActivity(
-                                                PlaybackActivity.buildIntent(
-                                                    context = context,
-                                                    episode = ep,
-                                                    source = CoordinatorSource.CHANNEL,
-                                                    channelId = channel.channelId,
-                                                    deckId = deckId,
-                                                    startPositionMs = resumePos
-                                                )
-                                            )
-                                        }
-                                    }
-                                },
+                                onLaunchChannel = launchChannelPlayback,
                                 onCreateChannel = { channelEditorState = ChannelEditorState.CreatingNew() },
                                 onEditChannel = { channel -> channelEditorState = ChannelEditorState.Editing(channel) }
                             )

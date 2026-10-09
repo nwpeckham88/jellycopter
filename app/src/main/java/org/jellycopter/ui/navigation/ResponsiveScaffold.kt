@@ -68,7 +68,10 @@ import android.content.Context
 import android.view.KeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import org.jellycopter.core.database.ChannelEntity
+import org.jellycopter.ui.components.AnalogStaticSnow
 import org.jellycopter.ui.components.AnalogVuMeter
+import org.jellycopter.ui.components.BroadcastSlateCard
 import org.jellycopter.ui.components.CrtScreenTube
 import org.jellycopter.ui.components.FocusCard
 import org.jellycopter.ui.components.JellycopterLogo
@@ -102,6 +105,9 @@ fun ResponsiveScaffold(
     currentScreen: NavScreen,
     onScreenSelected: (NavScreen) -> Unit,
     isDiscoverEnabled: Boolean = true,
+    liveChannels: List<ChannelEntity> = emptyList(),
+    onTuneSmartChannel: ((ChannelEntity) -> Unit)? = null,
+    onCreateSmartChannelAt: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -115,6 +121,9 @@ fun ResponsiveScaffold(
             currentScreen = currentScreen,
             onScreenSelected = onScreenSelected,
             isDiscoverEnabled = isDiscoverEnabled,
+            liveChannels = liveChannels,
+            onTuneSmartChannel = onTuneSmartChannel,
+            onCreateSmartChannelAt = onCreateSmartChannelAt,
             modifier = modifier,
             content = content
         )
@@ -140,6 +149,9 @@ private fun TvLeanbackLayout(
     currentScreen: NavScreen,
     onScreenSelected: (NavScreen) -> Unit,
     isDiscoverEnabled: Boolean,
+    liveChannels: List<ChannelEntity>,
+    onTuneSmartChannel: ((ChannelEntity) -> Unit)?,
+    onCreateSmartChannelAt: ((Int) -> Unit)?,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -170,23 +182,26 @@ private fun TvLeanbackLayout(
         }
     }
 
-    // Map screen to channel number (2..13)
-    fun screenToChannel(screen: NavScreen): Int = when (screen) {
-        NavScreen.HOME -> 2
-        NavScreen.DISCOVER -> 3
-        NavScreen.CHANNELS -> 4
-        NavScreen.LIBRARY -> 5
-        NavScreen.TROPHY_ROOM -> 6
-        NavScreen.SETTINGS -> 7
-        NavScreen.POST_PLAYBACK -> 2
-    }
+    var currentChannel by remember { mutableStateOf(2) }
 
-    var currentChannel by remember { mutableStateOf(screenToChannel(currentScreen)) }
-
-    LaunchedEffect(currentScreen) {
-        val expected = screenToChannel(currentScreen)
-        if (currentChannel in 2..7 && currentChannel != expected) {
-            currentChannel = expected
+    fun getChannelLabel(channel: Int): String {
+        if (currentScreen != NavScreen.HOME) {
+            return when (currentScreen) {
+                NavScreen.LIBRARY -> "AUX • LIBRARY"
+                NavScreen.DISCOVER -> "AUX • DISCOVER"
+                NavScreen.TROPHY_ROOM -> "AUX • TROPHIES"
+                NavScreen.SETTINGS -> "AUX • SETTINGS"
+                NavScreen.CHANNELS -> "AUX • CHANNELS"
+                NavScreen.POST_PLAYBACK -> "AUX • STATS"
+                else -> "AUX INPUT"
+            }
+        }
+        return when (channel) {
+            2 -> "TV GUIDE"
+            else -> {
+                val sc = liveChannels.firstOrNull { it.channelNumber == channel }
+                sc?.name?.uppercase() ?: "NO SIGNAL"
+            }
         }
     }
 
@@ -198,33 +213,13 @@ private fun TvLeanbackLayout(
         }
         RetroAudioEffects.playKnobClick()
         currentChannel = normalized
-        when (normalized) {
-            2 -> onScreenSelected(NavScreen.HOME)
-            3 -> onScreenSelected(NavScreen.DISCOVER)
-            4 -> onScreenSelected(NavScreen.CHANNELS)
-            5 -> onScreenSelected(NavScreen.LIBRARY)
-            6 -> onScreenSelected(NavScreen.TROPHY_ROOM)
-            7 -> onScreenSelected(NavScreen.SETTINGS)
-            else -> {
-                // Channels 8..13 are off-air broadcast channels
-            }
+        if (currentScreen != NavScreen.HOME) {
+            onScreenSelected(NavScreen.HOME)
         }
     }
 
-    fun getChannelLabel(channel: Int): String = when (channel) {
-        2 -> "GUIDE"
-        3 -> "DISCOVER"
-        4 -> "CHANNELS"
-        5 -> "LIBRARY"
-        6 -> "TROPHIES"
-        7 -> "SETTINGS"
-        8 -> "UHF 08"
-        9 -> "BROADCAST 09"
-        10 -> "RETRO RELAY"
-        11 -> "TEST PATTERN"
-        12 -> "COLOR BARS"
-        13 -> "SIGN-OFF"
-        else -> "CHANNEL $channel"
+    BackHandler(enabled = currentScreen == NavScreen.HOME && currentChannel != 2) {
+        changeChannel(2)
     }
 
     // Outer frame: 16:9 walnut woodgrain cabinet with brass pinstripe border
@@ -354,7 +349,7 @@ private fun TvLeanbackLayout(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 Text(
-                                    text = "CH ${if (currentChannel < 10) "0$currentChannel" else "$currentChannel"}",
+                                    text = if (currentScreen != NavScreen.HOME) "AUX" else "CH ${if (currentChannel < 10) "0$currentChannel" else "$currentChannel"}",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Black,
                                     fontFamily = FontFamily.Monospace,
@@ -403,10 +398,26 @@ private fun TvLeanbackLayout(
                                 .fillMaxWidth()
                                 .padding(start = 14.dp, end = 14.dp, bottom = 10.dp)
                         ) {
-                            if (currentChannel <= 7) {
+                            if (currentScreen != NavScreen.HOME) {
+                                content()
+                            } else if (currentChannel == 2) {
                                 content()
                             } else {
-                                RetroOffAirScreen(channelNumber = currentChannel)
+                                val smartChannel = liveChannels.firstOrNull { it.channelNumber == currentChannel }
+                                if (smartChannel != null) {
+                                    SmartChannelBroadcastView(
+                                        channel = smartChannel,
+                                        onTune = { onTuneSmartChannel?.invoke(smartChannel) },
+                                        scanlinesEnabled = scanlinesEnabled
+                                    )
+                                } else {
+                                    AnalogStaticSnow(
+                                        isUnprogrammed = true,
+                                        channelNumber = currentChannel,
+                                        onProgramChannel = { onCreateSmartChannelAt?.invoke(currentChannel) },
+                                        promptText = "[PRESS ENTER TO PROGRAM CHANNEL $currentChannel]"
+                                    )
+                                }
                             }
                         }
                     }
@@ -448,7 +459,7 @@ private fun TvLeanbackLayout(
                 )
 
                 VfdChannelDisplay(
-                    channelNumber = currentChannel,
+                    channelNumber = if (currentScreen != NavScreen.HOME) 0 else currentChannel,
                     channelName = getChannelLabel(currentChannel),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -461,33 +472,36 @@ private fun TvLeanbackLayout(
                 ) {
                     TactilePushButton(
                         label = "[CH 2] GUIDE",
-                        isSelected = currentScreen == NavScreen.HOME,
-                        onClick = { changeChannel(2) },
+                        isSelected = currentScreen == NavScreen.HOME && currentChannel == 2,
+                        onClick = {
+                            changeChannel(2)
+                            onScreenSelected(NavScreen.HOME)
+                        },
                         badgeText = "02"
                     )
                     TactilePushButton(
                         label = "[LIBRARY]",
                         isSelected = currentScreen == NavScreen.LIBRARY,
-                        onClick = { changeChannel(5) },
-                        badgeText = "05"
+                        onClick = { onScreenSelected(NavScreen.LIBRARY) },
+                        badgeText = "AUX"
                     )
                     TactilePushButton(
                         label = "[DISCOVER]",
                         isSelected = currentScreen == NavScreen.DISCOVER,
-                        onClick = { changeChannel(3) },
-                        badgeText = "03"
+                        onClick = { onScreenSelected(NavScreen.DISCOVER) },
+                        badgeText = "AUX"
                     )
                     TactilePushButton(
                         label = "[TROPHIES]",
                         isSelected = currentScreen == NavScreen.TROPHY_ROOM,
-                        onClick = { changeChannel(6) },
-                        badgeText = "06"
+                        onClick = { onScreenSelected(NavScreen.TROPHY_ROOM) },
+                        badgeText = "AUX"
                     )
                     TactilePushButton(
                         label = "[SETTINGS]",
                         isSelected = currentScreen == NavScreen.SETTINGS,
-                        onClick = { changeChannel(7) },
-                        badgeText = "07"
+                        onClick = { onScreenSelected(NavScreen.SETTINGS) },
+                        badgeText = "AUX"
                     )
                 }
 
@@ -503,65 +517,87 @@ private fun TvLeanbackLayout(
 }
 
 @Composable
-private fun RetroOffAirScreen(channelNumber: Int, modifier: Modifier = Modifier) {
-    Column(
+private fun SmartChannelBroadcastView(
+    channel: ChannelEntity,
+    onTune: () -> Unit,
+    scanlinesEnabled: Boolean,
+    modifier: Modifier = Modifier
+) {
+    var hasAutoLaunched by remember(channel.channelId) { mutableStateOf(false) }
+
+    LaunchedEffect(channel.channelId) {
+        RetroAudioEffects.playStaticBurst()
+        delay(2000L)
+        if (!hasAutoLaunched) {
+            hasAutoLaunched = true
+            onTune()
+        }
+    }
+
+    var isFocused by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .height(130.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .border(BorderStroke(2.dp, Color(0xFF3E2818)), RoundedCornerShape(8.dp))
-        ) {
-            val bars = listOf(
-                Color(0xFFE5E5E5),
-                Color(0xFFC0C000),
-                Color(0xFF00C0C0),
-                Color(0xFF00C000),
-                Color(0xFFC000C0),
-                Color(0xFFC000C0),
-                Color(0xFF0000C0)
+            .focusable(interactionSource = interactionSource)
+            .onFocusChanged { isFocused = it.isFocused }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {
+                    RetroAudioEffects.playKnobClick()
+                    onTune()
+                }
             )
-            bars.forEach { c ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .background(c)
-                )
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyUp) {
+                    when (keyEvent.key) {
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                            RetroAudioEffects.playKnobClick()
+                            onTune()
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
             }
+    ) {
+        val chNumStr = if (channel.channelNumber < 10) "0${channel.channelNumber}" else "${channel.channelNumber}"
+        BroadcastSlateCard(
+            modifier = Modifier.fillMaxSize(),
+            stationCallsign = "[WJEL-TV CH $chNumStr]",
+            channelTitle = channel.name.uppercase(),
+            showTitle = channel.description?.takeIf { it.isNotBlank() } ?: "BROADCAST TRANSMISSION ACQUIRED",
+            statusText = if (hasAutoLaunched) "BROADCAST READY • PRESS ENTER TO WATCH" else "TUNING SIGNAL • PLEASE STAND BY",
+            scanlinesEnabled = scanlinesEnabled
+        )
+
+        // Overlay action pill at bottom center
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 28.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xE60A0E14))
+                .border(
+                    BorderStroke(
+                        width = if (isFocused) 2.dp else 1.5.dp,
+                        color = if (isFocused) Color(0xFFFFD54F) else Color(0xFF34D399)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .padding(horizontal = 20.dp, vertical = 10.dp)
+        ) {
+            Text(
+                text = "[PRESS ENTER TO WATCH LIVE]",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.sp,
+                color = if (isFocused) Color(0xFFFFD54F) else Color(0xFF34D399)
+            )
         }
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        Text(
-            text = "BROADCAST CH ${if (channelNumber < 10) "0$channelNumber" else "$channelNumber"}",
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Black,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 2.sp,
-            color = Color(0xFFFFB300)
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "OFF-AIR • PLEASE STAND BY",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            color = Color(0xFF34D399)
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Tune rotary dial or press [CH 2] for TV Guide",
-            fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace,
-            color = Color(0xFF94A3B8)
-        )
     }
 }
 

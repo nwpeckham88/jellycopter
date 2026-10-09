@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -263,6 +264,28 @@ private fun ChannelRow(
                     Spacer(modifier = Modifier.width(18.dp))
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            val chNum = entity.channelNumber
+                            val chFormatted = if (chNum < 10) "CH 0$chNum" else "CH $chNum"
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color(0xFF03160D))
+                                    .border(
+                                        width = 1.dp,
+                                        color = Color(0xFF34D399).copy(alpha = 0.7f),
+                                        shape = RoundedCornerShape(4.dp)
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = chFormatted,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF34D399)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = item.title,
                                 fontSize = 17.sp,
