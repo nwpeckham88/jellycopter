@@ -34,6 +34,10 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.SpeakerGroup
 import androidx.compose.material.icons.rounded.Subtitles
 import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.rounded.Tv
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+import org.jellycopter.ui.components.RetroAudioEffects
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -124,6 +128,21 @@ fun SettingsScreen(
     val initialJellyseerr = settingsRepository?.getJellyseerrUrl() ?: ""
     var jellyseerrUrlText by remember { mutableStateOf(initialJellyseerr) }
     var jellyseerrSaveStatus by remember { mutableStateOf<String?>(null) }
+
+    // Retro 1978 Woodgrain TV & CRT Settings
+    val context = LocalContext.current
+    val prefs = remember(context) {
+        context.getSharedPreferences("jellycopter_settings", Context.MODE_PRIVATE)
+    }
+    var crtScanlinesEnabled by remember(prefs) {
+        mutableStateOf(prefs.getBoolean("key_crt_scanlines", true))
+    }
+    var retroSoundEnabled by remember(prefs) {
+        mutableStateOf(prefs.getBoolean("key_retro_sound_effects", RetroAudioEffects.isEnabled))
+    }
+    var smartAspectRatioEnabled by remember(prefs) {
+        mutableStateOf(prefs.getBoolean("key_smart_aspect_ratio", true))
+    }
 
     // Plugin Sync Probe Status from ViewModel
     val pluginStatus = vm.pluginStatus
@@ -298,6 +317,7 @@ fun SettingsScreen(
                     )
 
                     val themes = listOf(
+                        Triple(BaseThemeMode.WOODGRAIN_CONSOLE_1978, "1978 Woodgrain Console", "Rich walnut cabinet with warm amber phosphor glow, curved CRT glass, and brushed brass trim"),
                         Triple(BaseThemeMode.WARM_DARK, "Warm Amber Dark", "Rich espresso backdrop with glowing golden amber accents, warm candlelight atmosphere, and terracotta highlights"),
                         Triple(BaseThemeMode.JELLYFIN_PURPLE, "Jellyfin Purple", "Deep navy backdrop with signature Jellyfin violet and cyan accents"),
                         Triple(BaseThemeMode.OLED_PURE_BLACK, "OLED Pure Black", "True 0-nit blacks optimized for OLED panels with crisp electric blue accents"),
@@ -363,6 +383,53 @@ fun SettingsScreen(
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // Section: 1978 Woodgrain Console & Retro TV Options
+        item {
+            SettingsCard(
+                title = "1978 Woodgrain Console & Retro TV Options",
+                icon = Icons.Rounded.Tv
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    // CRT Scanlines Toggle Card
+                    SettingsToggleCard(
+                        title = "CRT Phosphor Scanlines",
+                        description = "Simulates authentic cathode ray tube horizontal raster scanlines and curved glass phosphor glow",
+                        checked = crtScanlinesEnabled,
+                        onCheckedChange = {
+                            crtScanlinesEnabled = it
+                            prefs.edit().putBoolean("key_crt_scanlines", it).apply()
+                        }
+                    )
+
+                    // Retro Sound Effects Toggle Card
+                    SettingsToggleCard(
+                        title = "Retro TV Sound Effects",
+                        description = "Synthesizes procedural vintage mechanical rotary knob switch clunks, channel click detents, and tuner noise",
+                        checked = retroSoundEnabled,
+                        onCheckedChange = {
+                            retroSoundEnabled = it
+                            RetroAudioEffects.isEnabled = it
+                            prefs.edit().putBoolean("key_retro_sound_effects", it).apply()
+                            if (it) {
+                                RetroAudioEffects.playKnobClick()
+                            }
+                        }
+                    )
+
+                    // Experimental Smart Aspect Ratio Toggle Card
+                    SettingsToggleCard(
+                        title = "Experimental Smart Aspect Ratio",
+                        description = "Dynamically letterboxes 16:9 widescreen streams and authentic 4:3 broadcast content inside the CRT tube",
+                        checked = smartAspectRatioEnabled,
+                        onCheckedChange = {
+                            smartAspectRatioEnabled = it
+                            prefs.edit().putBoolean("key_smart_aspect_ratio", it).apply()
+                        }
+                    )
                 }
             }
         }
