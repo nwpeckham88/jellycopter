@@ -110,10 +110,7 @@ fun HomeScreen(
         if (mediaRepository != null) {
             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 try {
-                    val folders = mediaRepository.getVirtualFolders()
-                    val allSeries = folders.flatMap { folder ->
-                        runCatching { mediaRepository.getSeriesInFolder(folder.id) }.getOrDefault(emptyList())
-                    }.distinctBy { it.id }
+                    val allSeries = runCatching { mediaRepository.getAllSeries() }.getOrDefault(emptyList()).distinctBy { it.id }
 
                     if (allSeries.isNotEmpty()) {
                         allSeries.mapNotNull { series ->

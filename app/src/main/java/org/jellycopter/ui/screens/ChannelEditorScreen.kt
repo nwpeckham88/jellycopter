@@ -139,6 +139,7 @@ fun ChannelEditorScreen(
     var showResumePicker by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showSeriesPicker by remember { mutableStateOf(false) }
+    var seriesSearchQuery by remember { mutableStateOf("") }
 
     val focusManager = LocalFocusManager.current
     val accent = JellycopterTheme.colors.primaryAccent
@@ -575,20 +576,55 @@ fun ChannelEditorScreen(
         // Series picker (inline) — shown when showSeriesPicker is true
         if (showSeriesPicker) {
             val unselected = availableSeries.filter { it.id !in selectedSeriesIds }
-            if (unselected.isEmpty()) {
+            val query = seriesSearchQuery.trim()
+            val filteredSeries = if (query.isBlank()) {
+                unselected
+            } else {
+                unselected.filter { it.name.contains(query, ignoreCase = true) }
+            }
+
+            item {
+                OutlinedTextField(
+                    value = seriesSearchQuery,
+                    onValueChange = { seriesSearchQuery = it },
+                    label = { Text("Filter Shows (e.g. Futurama, Bob's Burgers)") },
+                    placeholder = { Text("Search by show title...", color = textSecondary) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = accent,
+                        unfocusedBorderColor = accent.copy(alpha = 0.5f),
+                        focusedLabelColor = accent,
+                        unfocusedLabelColor = textSecondary,
+                        focusedTextColor = textPrimary,
+                        unfocusedTextColor = textPrimary,
+                        cursorColor = accent
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
+                )
+            }
+
+            if (filteredSeries.isEmpty()) {
                 item {
                     Text(
-                        text = "All available library series have been added to this channel.",
+                        text = if (unselected.isEmpty()) {
+                            "All available library series have been added to this channel."
+                        } else {
+                            "No TV shows found matching \"$seriesSearchQuery\"."
+                        },
                         color = textSecondary,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(8.dp)
                     )
                 }
             } else {
-                items(unselected, key = { "picker_${it.id}" }) { series ->
+                items(filteredSeries, key = { "picker_${it.id}" }) { series ->
+                    val posterUrl = series.posterUrl ?: mediaRepository?.buildPrimaryImageUrl(series.id)
                     FocusCard(
                         onClick = {
                             selectedSeriesIds.add(series.id)
+                            seriesSearchQuery = ""
                             showSeriesPicker = false
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -598,12 +634,55 @@ fun ChannelEditorScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(if (isFocused) accent.copy(alpha = 0.2f) else surface)
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isFocused) accent else Color.Transparent,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Rounded.Add, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(series.name, color = textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            if (!posterUrl.isNullOrBlank()) {
+                                SubcomposeAsyncImage(
+                                    model = posterUrl,
+                                    contentDescription = series.name,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(width = 28.dp, height = 40.dp)
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    error = {
+                                        Icon(Icons.Rounded.Tv, null, tint = accent, modifier = Modifier.size(20.dp))
+                                    }
+                                )
+                            } else {
+                                Icon(Icons.Rounded.Tv, null, tint = accent, modifier = Modifier.size(20.dp))
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = series.name,
+                                    color = textPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1
+                                )
+                                val metaDetails = buildList {
+                                    series.premiereYear?.let { add(it.toString()) }
+                                    series.communityRating?.let { add("★ ${String.format("%.1f", it)}") }
+                                }
+                                if (metaDetails.isNotEmpty()) {
+                                    Text(
+                                        text = metaDetails.joinToString(" • "),
+                                        color = textSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(Icons.Rounded.Add, contentDescription = "Add Show", tint = accent, modifier = Modifier.size(20.dp))
                         }
                     }
                 }

@@ -66,6 +66,7 @@ object JellyfinImageUrlBuilder {
 interface MediaRepository {
     suspend fun getVirtualFolders(): List<VirtualFolder>
     suspend fun getSeriesInFolder(folderId: String): List<SeriesDetail>
+    suspend fun getAllSeries(): List<SeriesDetail> = emptyList()
     suspend fun getSeriesDetail(seriesId: String): SeriesDetail?
     suspend fun getNextUpForSeries(seriesId: String): EpisodeItem?
     suspend fun getFirstEpisodeForSeries(seriesId: String): EpisodeItem?
@@ -125,7 +126,7 @@ class DefaultMediaRepository(
                     val root = jsonParser.parseToJsonElement(responseBody).jsonObject
                     val items = root["Items"]?.jsonArray
                     if (items != null && items.isNotEmpty()) {
-                        return@withContext items.map { element ->
+                        val folders = items.map { element ->
                             val obj = element.jsonObject
                             VirtualFolder(
                                 id = obj["Id"]?.jsonPrimitive?.contentOrNull
@@ -136,10 +137,15 @@ class DefaultMediaRepository(
                                     ?: obj["collectionType"]?.jsonPrimitive?.contentOrNull
                             )
                         }
+                        android.util.Log.d("JELLY_DEBUG", "getVirtualFolders: ${folders.map { "${it.name} (id=${it.id}, type=${it.collectionType})" }}")
+                        return@withContext folders
                     }
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    android.util.Log.e("JELLY_DEBUG", "getVirtualFolders parse error", e)
                     // Fall back to mock dataset on parse error
                 }
+            } else {
+                android.util.Log.w("JELLY_DEBUG", "getVirtualFolders executeGet returned null from $url (token len=${session.accessToken.length})")
             }
         }
         MockMediaDataset.virtualFolders
@@ -152,10 +158,12 @@ class DefaultMediaRepository(
                     "?parentId=$folderId&includeItemTypes=Series,Movie&recursive=true" +
                     "&fields=Overview,PrimaryImageAspectRatio,CommunityRating,PremiereDate,ProductionYear,ProviderIds,ChildCount"
             val responseBody = executeGet(url, session.accessToken)
+            android.util.Log.d("JELLY_DEBUG", "getSeriesInFolder folderId=$folderId url=$url responseLen=${responseBody?.length ?: 0}")
             if (responseBody != null) {
                 try {
                     val root = jsonParser.parseToJsonElement(responseBody).jsonObject
                     val items = root["Items"]?.jsonArray
+                    android.util.Log.d("JELLY_DEBUG", "getSeriesInFolder folderId=$folderId itemsCount=${items?.size ?: 0} sampleTypes=${items?.take(5)?.map { it.jsonObject["Type"]?.jsonPrimitive?.contentOrNull }}")
                     if (items != null && items.isNotEmpty()) {
                         return@withContext items.map { element ->
                             val obj = element.jsonObject
@@ -191,6 +199,54 @@ class DefaultMediaRepository(
             }
         }
         MockMediaDataset.getSeriesForFolder(folderId)
+    }
+
+    override suspend fun getAllSeries(): List<SeriesDetail> = withContext(ioDispatcher) {
+        val session = sessionStorage?.getSession()
+        if (session != null) {
+            val url = "${session.serverUrl.removeSuffix("/")}/Users/${session.userId}/Items" +
+                    "?includeItemTypes=Series&recursive=true&sortBy=SortName" +
+                    "&fields=Overview,PrimaryImageAspectRatio,CommunityRating,PremiereDate,ProductionYear,ProviderIds,ChildCount"
+            val responseBody = executeGet(url, session.accessToken)
+            if (responseBody != null) {
+                try {
+                    val root = jsonParser.parseToJsonElement(responseBody).jsonObject
+                    val items = root["Items"]?.jsonArray
+                    if (items != null && items.isNotEmpty()) {
+                        return@withContext items.map { element ->
+                            val obj = element.jsonObject
+                            val seriesId = obj["Id"]?.jsonPrimitive?.contentOrNull
+                                ?: obj["id"]?.jsonPrimitive?.contentOrNull ?: ""
+                            val seriesName = obj["Name"]?.jsonPrimitive?.contentOrNull
+                                ?: obj["name"]?.jsonPrimitive?.contentOrNull ?: ""
+                            val overview = obj["Overview"]?.jsonPrimitive?.contentOrNull
+                            val rating = obj["CommunityRating"]?.jsonPrimitive?.floatOrNull
+                            val year = obj["ProductionYear"]?.jsonPrimitive?.intOrNull
+                                ?: parseYearFromDate(obj["PremiereDate"]?.jsonPrimitive?.contentOrNull)
+                            val providerIds = obj["ProviderIds"]?.jsonObject ?: obj["providerIds"]?.jsonObject
+                            val tmdbId = providerIds?.get("Tmdb")?.jsonPrimitive?.contentOrNull?.toIntOrNull()
+                                ?: providerIds?.get("tmdb")?.jsonPrimitive?.contentOrNull?.toIntOrNull()
+
+                            SeriesDetail(
+                                id = seriesId,
+                                name = seriesName,
+                                overview = overview,
+                                posterUrl = JellyfinImageUrlBuilder.buildPrimaryImageUrl(session.serverUrl, seriesId),
+                                backdropUrl = JellyfinImageUrlBuilder.buildBackdropImageUrl(session.serverUrl, seriesId),
+                                communityRating = rating,
+                                premiereYear = year,
+                                seasons = emptyList(),
+                                nextUpEpisode = null,
+                                tmdbId = tmdbId
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("JELLY_DEBUG", "getAllSeries parse error", e)
+                }
+            }
+        }
+        MockMediaDataset.mockSeriesDetails.values.toList()
     }
 
     override suspend fun getSeriesDetail(seriesId: String): SeriesDetail? = withContext(ioDispatcher) {
@@ -486,7 +542,7 @@ object MockMediaDataset {
         EpisodeItem("ep_bebop_101", "Asteroid Blues", "series_cowboy_bebop", "Cowboy Bebop", "season_bebop_1", 1, 1, 14400000000L, "Spike Spiegel and Jet Black pursue a drug-smuggling syndicate fugitive on the asteroid colony of Tijuana.")
     )
 
-    private val mockSeriesDetails: Map<String, SeriesDetail> = mapOf(
+    val mockSeriesDetails: Map<String, SeriesDetail> = mapOf(
         "series_1" to SeriesDetail(
             id = "series_1",
             name = "Severance",

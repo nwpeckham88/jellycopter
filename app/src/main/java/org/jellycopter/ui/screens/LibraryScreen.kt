@@ -298,59 +298,7 @@ fun LibraryScreen(
             }
         }
 
-        // 2. TV Search Bar (Full Width)
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = {
-                    Text(
-                        text = "Search titles or descriptions across catalog...",
-                        color = Color.White.copy(alpha = 0.45f),
-                        fontSize = 13.sp
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Rounded.Search,
-                        contentDescription = "Search",
-                        tint = if (searchQuery.isNotBlank() || isSearchFocused) JellycopterTheme.colors.primaryAccent else Color.White.copy(alpha = 0.5f),
-                        modifier = Modifier.size(20.dp)
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotBlank()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = "Clear search",
-                                tint = Color.White.copy(alpha = 0.7f),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedContainerColor = JellycopterTheme.colors.surfaceVariant,
-                    unfocusedContainerColor = JellycopterTheme.colors.surface,
-                    focusedBorderColor = JellycopterTheme.colors.primaryAccent,
-                    unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                    cursorColor = JellycopterTheme.colors.primaryAccent
-                ),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .onFocusChanged { isSearchFocused = it.isFocused }
-            )
-        }
-
-        // 3. Category Tabs & Filter Chips (Full Width)
+        // 2. Category Tabs & Filter Chips (Full Width)
         if (foldersState.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -407,7 +355,7 @@ fun LibraryScreen(
                                                 color = if (isFilterActive) JellycopterTheme.colors.primaryAccent else Color(0x18FFFFFF),
                                                 shape = RoundedCornerShape(8.dp)
                                             )
-                                            .padding(horizontal = 12.dp),
+                                             .padding(horizontal = 12.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
@@ -463,6 +411,58 @@ fun LibraryScreen(
                     }
                 }
             }
+        }
+
+        // 3. TV Search Bar (Full Width)
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = {
+                    Text(
+                        text = "Search titles or descriptions across catalog...",
+                        color = Color.White.copy(alpha = 0.45f),
+                        fontSize = 13.sp
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Search,
+                        contentDescription = "Search",
+                        tint = if (searchQuery.isNotBlank() || isSearchFocused) JellycopterTheme.colors.primaryAccent else Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotBlank()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Clear search",
+                                tint = Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedContainerColor = JellycopterTheme.colors.surfaceVariant,
+                    unfocusedContainerColor = JellycopterTheme.colors.surface,
+                    focusedBorderColor = JellycopterTheme.colors.primaryAccent,
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
+                    cursorColor = JellycopterTheme.colors.primaryAccent
+                ),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .onFocusChanged { isSearchFocused = it.isFocused }
+            )
         }
 
         // 4. Section Subheader (Full Width)

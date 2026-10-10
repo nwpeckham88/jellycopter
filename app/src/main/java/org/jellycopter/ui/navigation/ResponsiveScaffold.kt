@@ -56,7 +56,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -114,8 +116,8 @@ fun ResponsiveScaffold(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    // Back key navigation: from any screen back to Home
-    BackHandler(enabled = currentScreen != NavScreen.HOME) {
+    // Back key navigation for mobile/tablet: from any screen back to Home
+    BackHandler(enabled = deviceType != DeviceType.TV && currentScreen != NavScreen.HOME) {
         onScreenSelected(NavScreen.HOME)
     }
 
@@ -209,7 +211,20 @@ private fun TvLeanbackLayout(
     }
 
     var isFocusInNavWing by remember { mutableStateOf(false) }
+    val crtScreenFocusRequester = remember { FocusRequester() }
     val guideFocusRequester = remember { FocusRequester() }
+    val libraryFocusRequester = remember { FocusRequester() }
+    val discoverFocusRequester = remember { FocusRequester() }
+    val trophiesFocusRequester = remember { FocusRequester() }
+    val settingsFocusRequester = remember { FocusRequester() }
+    val dialFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(300L)
+        try {
+            guideFocusRequester.requestFocus()
+        } catch (_: Exception) {}
+    }
 
     fun changeChannel(newChannel: Int) {
         val normalized = when {
@@ -227,20 +242,26 @@ private fun TvLeanbackLayout(
     // Android TV Leanback Back-button routing:
     // 1. Browsing content on Home Channel 2 -> hop focus to tuner navigation wing
     BackHandler(enabled = currentScreen == NavScreen.HOME && currentChannel == 2 && !isFocusInNavWing) {
-        guideFocusRequester.requestFocus()
+        try {
+            guideFocusRequester.requestFocus()
+        } catch (_: Exception) {}
     }
 
     // 2. Watching a broadcast channel on Home -> tune back to Channel 2 (Guide) and focus wing
     BackHandler(enabled = currentScreen == NavScreen.HOME && currentChannel != 2) {
         changeChannel(2)
-        guideFocusRequester.requestFocus()
+        try {
+            guideFocusRequester.requestFocus()
+        } catch (_: Exception) {}
     }
 
     // 3. Sub-screens (Library, Settings, Discover, Trophies) -> return to Home Channel 2 and focus wing
     BackHandler(enabled = currentScreen != NavScreen.HOME) {
         onScreenSelected(NavScreen.HOME)
         changeChannel(2)
-        guideFocusRequester.requestFocus()
+        try {
+            guideFocusRequester.requestFocus()
+        } catch (_: Exception) {}
     }
 
     // Outer frame: 16:9 walnut woodgrain cabinet with brass pinstripe border
@@ -340,6 +361,18 @@ private fun TvLeanbackLayout(
                 modifier = Modifier
                     .weight(0.72f)
                     .fillMaxHeight()
+                    .focusGroup()
+                    .focusRequester(crtScreenFocusRequester)
+                    .focusProperties {
+                        right = when (currentScreen) {
+                            NavScreen.HOME -> guideFocusRequester
+                            NavScreen.LIBRARY -> libraryFocusRequester
+                            NavScreen.DISCOVER -> discoverFocusRequester
+                            NavScreen.TROPHY_ROOM -> trophiesFocusRequester
+                            NavScreen.SETTINGS -> settingsFocusRequester
+                            else -> guideFocusRequester
+                        }
+                    }
             ) {
                 CrtScreenTube(
                     modifier = Modifier.fillMaxSize(),
@@ -469,7 +502,13 @@ private fun TvLeanbackLayout(
                 RotaryChannelDial(
                     selectedChannel = currentChannel,
                     onChannelSelected = { changeChannel(it) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(dialFocusRequester)
+                        .focusProperties {
+                            left = crtScreenFocusRequester
+                            down = guideFocusRequester
+                        },
                     dialSize = 58.dp
                 )
 
@@ -500,35 +539,67 @@ private fun TvLeanbackLayout(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .focusRequester(guideFocusRequester),
+                            .focusRequester(guideFocusRequester)
+                            .focusProperties {
+                                left = crtScreenFocusRequester
+                                up = dialFocusRequester
+                                down = libraryFocusRequester
+                            },
                         badgeText = "02"
                     )
                     TactilePushButton(
                         label = "[LIBRARY]",
                         isSelected = currentScreen == NavScreen.LIBRARY,
                         onClick = { onScreenSelected(NavScreen.LIBRARY) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(libraryFocusRequester)
+                            .focusProperties {
+                                left = crtScreenFocusRequester
+                                up = guideFocusRequester
+                                down = discoverFocusRequester
+                            },
                         badgeText = "AUX"
                     )
                     TactilePushButton(
                         label = "[DISCOVER]",
                         isSelected = currentScreen == NavScreen.DISCOVER,
                         onClick = { onScreenSelected(NavScreen.DISCOVER) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(discoverFocusRequester)
+                            .focusProperties {
+                                left = crtScreenFocusRequester
+                                up = libraryFocusRequester
+                                down = trophiesFocusRequester
+                            },
                         badgeText = "AUX"
                     )
                     TactilePushButton(
                         label = "[TROPHIES]",
                         isSelected = currentScreen == NavScreen.TROPHY_ROOM,
                         onClick = { onScreenSelected(NavScreen.TROPHY_ROOM) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(trophiesFocusRequester)
+                            .focusProperties {
+                                left = crtScreenFocusRequester
+                                up = discoverFocusRequester
+                                down = settingsFocusRequester
+                            },
                         badgeText = "AUX"
                     )
                     TactilePushButton(
                         label = "[SETTINGS]",
                         isSelected = currentScreen == NavScreen.SETTINGS,
                         onClick = { onScreenSelected(NavScreen.SETTINGS) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(settingsFocusRequester)
+                            .focusProperties {
+                                left = crtScreenFocusRequester
+                                up = trophiesFocusRequester
+                            },
                         badgeText = "AUX"
                     )
                 }

@@ -144,14 +144,11 @@ fun JellycopterAppContent(
     val liveChannels by (resolvedChannelRepo?.getAllChannels()
         ?: kotlinx.coroutines.flow.flowOf(emptyList())).collectAsState(initial = emptyList())
 
-    // All available series for the channel editor picker (loads all folders then flattens on IO)
+    // All available series for the channel editor picker (loads all TV series via getAllSeries)
     val availableSeries by produceState<List<SeriesDetail>>(initialValue = emptyList(), resolvedMediaRepo) {
         if (resolvedMediaRepo != null) {
             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                val folders = runCatching { resolvedMediaRepo.getVirtualFolders() }.getOrDefault(emptyList())
-                folders.flatMap { folder ->
-                    runCatching { resolvedMediaRepo.getSeriesInFolder(folder.id) }.getOrDefault(emptyList())
-                }
+                runCatching { resolvedMediaRepo.getAllSeries() }.getOrDefault(emptyList())
             }
         }
     }

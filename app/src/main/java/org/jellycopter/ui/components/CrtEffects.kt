@@ -696,30 +696,7 @@ fun RotaryChannelDial(
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .border(
-                BorderStroke(
-                    if (isFocused) 2.dp else 1.dp,
-                    if (isFocused) JellycopterTheme.colors.borderGlow else Color(0x33C8A060)
-                ),
-                RoundedCornerShape(8.dp)
-            )
-            .background(Color(0xFF1E1710))
-            .padding(horizontal = 6.dp, vertical = 4.dp)
-            .onFocusChanged { isFocused = it.isFocused }
-            .onKeyEvent { keyEvent ->
-                when (keyEvent.key) {
-                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                        if (keyEvent.type == KeyEventType.KeyUp) {
-                            val next = if (selectedChannel >= 13) 2 else selectedChannel + 1
-                            RetroAudioEffects.playKnobClick()
-                            onChannelSelected(next)
-                        }
-                        true
-                    }
-                    else -> false
-                }
-            }
+            .onFocusChanged { state -> isFocused = state.isFocused }
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -728,7 +705,17 @@ fun RotaryChannelDial(
                     RetroAudioEffects.playKnobClick()
                     onChannelSelected(next)
                 }
-            ),
+            )
+            .clip(RoundedCornerShape(8.dp))
+            .border(
+                BorderStroke(
+                    if (isFocused) 2.5.dp else 1.dp,
+                    if (isFocused) Color(0xFFFFD54F) else Color(0x33C8A060)
+                ),
+                RoundedCornerShape(8.dp)
+            )
+            .background(if (isFocused) Color(0xFF2E2015) else Color(0xFF1E1710))
+            .padding(horizontal = 6.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Label Header
@@ -1083,39 +1070,7 @@ fun TactilePushButton(
 
     Box(
         modifier = modifier
-            .clip(shape)
-            .background(
-                when {
-                    isFocused -> Color(0xFF4A3420)
-                    isSelected -> Color(0xFF382617)
-                    else -> Color(0xFF23180E)
-                }
-            )
-            // 3D Bevel highlight & shadow
-            .border(
-                BorderStroke(
-                    width = if (isFocused) 2.dp else 1.dp,
-                    color = when {
-                        isFocused -> Color(0xFFFFD54F)
-                        isSelected -> Color(0xFFD4AF37)
-                        else -> Color(0xFF5A3E24)
-                    }
-                ),
-                shape = shape
-            )
-            .onFocusChanged { isFocused = it.isFocused }
-            .onKeyEvent { keyEvent ->
-                when (keyEvent.key) {
-                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                        if (keyEvent.type == KeyEventType.KeyUp) {
-                            RetroAudioEffects.playKnobClick()
-                            onClick()
-                        }
-                        true
-                    }
-                    else -> false
-                }
-            }
+            .onFocusChanged { state -> isFocused = state.isFocused }
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -1124,7 +1079,27 @@ fun TactilePushButton(
                     onClick()
                 }
             )
-            .padding(horizontal = 8.dp, vertical = 4.5.dp),
+            .clip(shape)
+            .background(
+                when {
+                    isFocused -> Color(0xFF5A3C22) // Highly visible focused amber-mahogany
+                    isSelected -> Color(0xFF382617)
+                    else -> Color(0xFF23180E)
+                }
+            )
+            // 3D Bevel highlight & shadow with bright gold border on focus
+            .border(
+                BorderStroke(
+                    width = if (isFocused) 2.5.dp else 1.dp,
+                    color = when {
+                        isFocused -> Color(0xFFFFD54F) // Radiant gold glow
+                        isSelected -> Color(0xFFD4AF37)
+                        else -> Color(0xFF5A3E24)
+                    }
+                ),
+                shape = shape
+            )
+            .padding(horizontal = 8.dp, vertical = 5.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -1139,19 +1114,19 @@ fun TactilePushButton(
                 // LED indicator dot
                 Box(
                     modifier = Modifier
-                        .size(5.dp)
+                        .size(6.dp)
                         .clip(CircleShape)
                         .background(
                             when {
-                                isFocused -> Color(0xFFFFB300)
-                                isSelected -> Color(0xFF34D399)
+                                isFocused -> Color(0xFFFFB300) // Glowing amber when focused
+                                isSelected -> Color(0xFF34D399) // Phosphor green when selected
                                 else -> Color(0xFF553C26)
                             }
                         )
                 )
                 Text(
                     text = label,
-                    fontSize = 10.5.sp,
+                    fontSize = 11.sp,
                     fontWeight = if (isFocused || isSelected) FontWeight.ExtraBold else FontWeight.Bold,
                     color = when {
                         isFocused -> Color(0xFFFFFBEB)
@@ -1169,7 +1144,11 @@ fun TactilePushButton(
                     fontSize = 8.5.sp,
                     fontWeight = FontWeight.Black,
                     fontFamily = FontFamily.Monospace,
-                    color = if (isSelected) Color(0xFF34D399) else Color(0x99C8A060)
+                    color = when {
+                        isFocused -> Color(0xFFFFD54F)
+                        isSelected -> Color(0xFF34D399)
+                        else -> Color(0x99C8A060)
+                    }
                 )
             }
         }
