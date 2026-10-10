@@ -113,6 +113,8 @@ fun ResponsiveScaffold(
     liveChannels: List<ChannelEntity> = emptyList(),
     onTuneSmartChannel: ((ChannelEntity) -> Unit)? = null,
     onCreateSmartChannelAt: ((Int) -> Unit)? = null,
+    currentTvChannel: Int = 2,
+    onTvChannelChanged: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -129,6 +131,8 @@ fun ResponsiveScaffold(
             liveChannels = liveChannels,
             onTuneSmartChannel = onTuneSmartChannel,
             onCreateSmartChannelAt = onCreateSmartChannelAt,
+            currentChannel = currentTvChannel,
+            onCurrentChannelChanged = onTvChannelChanged,
             modifier = modifier,
             content = content
         )
@@ -157,6 +161,8 @@ private fun TvLeanbackLayout(
     liveChannels: List<ChannelEntity>,
     onTuneSmartChannel: ((ChannelEntity) -> Unit)?,
     onCreateSmartChannelAt: ((Int) -> Unit)?,
+    currentChannel: Int = 2,
+    onCurrentChannelChanged: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -186,8 +192,6 @@ private fun TvLeanbackLayout(
             }
         }
     }
-
-    var currentChannel by remember { mutableStateOf(2) }
 
     fun getChannelLabel(channel: Int): String {
         if (currentScreen != NavScreen.HOME) {
@@ -233,7 +237,7 @@ private fun TvLeanbackLayout(
             else -> newChannel
         }
         RetroAudioEffects.playKnobClick()
-        currentChannel = normalized
+        onCurrentChannelChanged(normalized)
         if (currentScreen != NavScreen.HOME) {
             onScreenSelected(NavScreen.HOME)
         }

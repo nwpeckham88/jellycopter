@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -223,186 +224,194 @@ private fun ChannelRow(
         StationPreviewGenerator.resolveShowTitles(entity.showsJson, mediaRepository, availableSeries)
     }
 
-    FocusCard(
-        onClick = onLaunch,
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(112.dp),
-        shape = RoundedCornerShape(12.dp)
-    ) { isFocused ->
-        Box(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        FocusCard(
+            onClick = onLaunch,
             modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    if (isFocused) JellycopterTheme.colors.surfaceVariant
-                    else JellycopterTheme.colors.surface.copy(alpha = 0.85f)
-                )
-                .border(
-                    width = 1.dp,
-                    color = if (isFocused) Color(0x35FFFFFF) else Color(0x12FFFFFF),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                .padding(horizontal = 20.dp, vertical = 14.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Station Artwork Preview + Channel info
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    StationPreviewArt(
-                        showsJson = entity.showsJson,
-                        mediaRepository = mediaRepository,
-                        modifier = Modifier.size(width = 130.dp, height = 74.dp),
-                        fallbackTitle = item.title,
-                        isFocused = isFocused
+                .weight(1f)
+                .fillMaxHeight(),
+            shape = RoundedCornerShape(12.dp)
+        ) { isFocused ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        if (isFocused) JellycopterTheme.colors.surfaceVariant
+                        else JellycopterTheme.colors.surface.copy(alpha = 0.85f)
                     )
-                    Spacer(modifier = Modifier.width(18.dp))
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            val chNum = entity.channelNumber
-                            val chFormatted = if (chNum < 10) "CH 0$chNum" else "CH $chNum"
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(Color(0xFF03160D))
-                                    .border(
-                                        width = 1.dp,
-                                        color = Color(0xFF34D399).copy(alpha = 0.7f),
-                                        shape = RoundedCornerShape(4.dp)
-                                    )
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = chFormatted,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Black,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = Color(0xFF34D399)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = item.title,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-                            if (showNames.isNotEmpty()) {
-                                Spacer(modifier = Modifier.width(8.dp))
+                    .border(
+                        width = 1.dp,
+                        color = if (isFocused) Color(0x35FFFFFF) else Color(0x12FFFFFF),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .padding(horizontal = 20.dp, vertical = 14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Station Artwork Preview + Channel info
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        StationPreviewArt(
+                            showsJson = entity.showsJson,
+                            mediaRepository = mediaRepository,
+                            modifier = Modifier.size(width = 130.dp, height = 74.dp),
+                            fallbackTitle = item.title,
+                            isFocused = isFocused
+                        )
+                        Spacer(modifier = Modifier.width(18.dp))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val chNum = entity.channelNumber
+                                val chFormatted = if (chNum < 10) "CH 0$chNum" else "CH $chNum"
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(4.dp))
-                                        .background(JellycopterTheme.colors.primaryAccent.copy(alpha = 0.15f))
+                                        .background(Color(0xFF03160D))
                                         .border(
                                             width = 1.dp,
-                                            color = JellycopterTheme.colors.primaryAccent.copy(alpha = 0.35f),
+                                            color = Color(0xFF34D399).copy(alpha = 0.7f),
                                             shape = RoundedCornerShape(4.dp)
                                         )
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
                                     Text(
-                                        text = "${showNames.size} SHOW${if (showNames.size == 1) "" else "S"}",
-                                        fontSize = 10.sp,
-                                        color = JellycopterTheme.colors.primaryAccent,
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 0.5.sp
+                                        text = chFormatted,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = Color(0xFF34D399)
                                     )
                                 }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = item.title,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                if (showNames.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(JellycopterTheme.colors.primaryAccent.copy(alpha = 0.15f))
+                                            .border(
+                                                width = 1.dp,
+                                                color = JellycopterTheme.colors.primaryAccent.copy(alpha = 0.35f),
+                                                shape = RoundedCornerShape(4.dp)
+                                            )
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "${showNames.size} SHOW${if (showNames.size == 1) "" else "S"}",
+                                            fontSize = 10.sp,
+                                            color = JellycopterTheme.colors.primaryAccent,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 0.5.sp
+                                        )
+                                    }
+                                }
                             }
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = item.description,
-                            fontSize = 12.sp,
-                            color = Color(0xFF94A3B8),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (showNames.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(3.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = (showNames.take(4) as Iterable<String>).joinToString(separator = "  ·  "),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF64748B),
+                                text = item.description,
+                                fontSize = 12.sp,
+                                color = Color(0xFF94A3B8),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                            if (showNames.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = (showNames.take(4) as Iterable<String>).joinToString(separator = "  ·  "),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF64748B),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // Play / Tune In button
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(
+                                if (isFocused) Color.White
+                                else JellycopterTheme.colors.primaryAccent
+                            )
+                            .padding(horizontal = 16.dp, vertical = 9.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isFocused) Icons.Rounded.PlayArrow else Icons.Rounded.Shuffle,
+                                contentDescription = if (isFocused) "Tune In" else "Shuffle Play",
+                                modifier = Modifier.size(15.dp),
+                                tint = if (isFocused) Color.Black else Color.White
+                            )
+                            Text(
+                                text = if (isFocused) "Tune In" else "Shuffle Play",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isFocused) Color.Black else Color.White,
+                                letterSpacing = 0.4.sp
+                            )
                         }
                     }
                 }
+            }
+        }
 
-                Spacer(modifier = Modifier.width(16.dp))
-
-                // Edit button (small, always visible)
-                FocusCard(
-                    onClick = onEdit,
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier.size(36.dp)
-                ) { editFocused ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                if (editFocused) Color.White
-                                else Color.White.copy(alpha = 0.07f)
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (editFocused) Color.White else Color(0x18FFFFFF),
-                                shape = RoundedCornerShape(6.dp)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Edit,
-                            contentDescription = "Edit channel",
-                            modifier = Modifier.size(16.dp),
-                            tint = if (editFocused) Color.Black else Color(0xFF94A3B8)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                // Play / Tune In button
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(
-                            if (isFocused) Color.White
-                            else JellycopterTheme.colors.primaryAccent
-                        )
-                        .padding(horizontal = 16.dp, vertical = 9.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (isFocused) Icons.Rounded.PlayArrow else Icons.Rounded.Shuffle,
-                            contentDescription = if (isFocused) "Tune In" else "Shuffle Play",
-                            modifier = Modifier.size(15.dp),
-                            tint = if (isFocused) Color.Black else Color.White
-                        )
-                        Text(
-                            text = if (isFocused) "Tune In" else "Shuffle Play",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isFocused) Color.Black else Color.White,
-                            letterSpacing = 0.4.sp
-                        )
-                    }
-                }
+        // Edit button (sibling FocusCard)
+        FocusCard(
+            onClick = onEdit,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .width(52.dp)
+                .fillMaxHeight()
+        ) { editFocused ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        if (editFocused) JellycopterTheme.colors.primaryAccent
+                        else JellycopterTheme.colors.surface.copy(alpha = 0.85f)
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (editFocused) Color(0x35FFFFFF) else Color(0x12FFFFFF),
+                        shape = RoundedCornerShape(12.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Edit,
+                    contentDescription = "Edit channel",
+                    modifier = Modifier.size(20.dp),
+                    tint = if (editFocused) Color.Black else Color(0xFF94A3B8)
+                )
             }
         }
     }

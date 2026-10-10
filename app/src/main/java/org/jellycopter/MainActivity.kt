@@ -175,6 +175,7 @@ fun JellycopterAppContent(
     }
 
     var currentScreen by remember { mutableStateOf(NavScreen.HOME) }
+    var currentTvChannel by remember { mutableStateOf(2) }
     var selectedSeriesId by remember { mutableStateOf<String?>(null) }
     var channelEditorState by remember { mutableStateOf<ChannelEditorState>(ChannelEditorState.Hidden) }
 
@@ -273,6 +274,7 @@ fun JellycopterAppContent(
                             initialChannelNumber = editorState.preSelectedChannelNumber,
                             existingChannels = liveChannels,
                             onSave = { entity ->
+                                currentTvChannel = entity.channelNumber
                                 mainViewModel.executeMutation {
                                     resolvedChannelRepo?.saveChannel(entity)
                                     val showIds = runCatching {
@@ -307,6 +309,7 @@ fun JellycopterAppContent(
                             mediaRepository = resolvedMediaRepo,
                             existingChannels = liveChannels,
                             onSave = { entity ->
+                                currentTvChannel = entity.channelNumber
                                 mainViewModel.executeMutation {
                                     resolvedChannelRepo?.saveChannel(entity)
                                     val showIds = runCatching {
@@ -442,8 +445,11 @@ fun JellycopterAppContent(
                         liveChannels = liveChannels,
                         onTuneSmartChannel = launchChannelPlayback,
                         onCreateSmartChannelAt = { chNum ->
+                            currentTvChannel = chNum
                             channelEditorState = ChannelEditorState.CreatingNew(preSelectedChannelNumber = chNum)
-                        }
+                        },
+                        currentTvChannel = currentTvChannel,
+                        onTvChannelChanged = { currentTvChannel = it }
                     ) {
                         when (currentScreen) {
                             NavScreen.HOME -> HomeScreen(

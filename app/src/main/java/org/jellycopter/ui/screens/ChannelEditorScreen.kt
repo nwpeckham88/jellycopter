@@ -1,5 +1,6 @@
 package org.jellycopter.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -94,6 +95,9 @@ fun ChannelEditorScreen(
     onDelete: ((String) -> Unit)? = null,
     onCancel: () -> Unit = {}
 ) {
+    // Intercept hardware/remote back press to cleanly cancel and exit editor
+    BackHandler(onBack = onCancel)
+
     val isEditing = existingChannel != null
 
     val defaultChannelNumber = remember(existingChannel, initialChannelNumber, existingChannels) {
@@ -155,6 +159,32 @@ fun ChannelEditorScreen(
     val surfaceVariant = JellycopterTheme.colors.surfaceVariant
     val textPrimary = JellycopterTheme.colors.onBackground
     val textSecondary = JellycopterTheme.colors.onSurface.copy(alpha = 0.7f)
+
+    val defaultName = if (channelNumber >= 3) "Channel $channelNumber" else "Channel 3"
+    val effectiveName = channelName.trim().ifBlank { defaultName }
+    val canSave = selectedSeriesIds.isNotEmpty()
+
+    val doSave: () -> Unit = {
+        if (canSave) {
+            val resolvedChannelNumber = (channelNumberText.toIntOrNull() ?: channelNumber).coerceAtLeast(3)
+            val finalName = channelName.trim().ifBlank { "Channel $resolvedChannelNumber" }
+            val showsJson = Json.encodeToString(selectedSeriesIds.toList())
+            val entity = ChannelEntity(
+                channelId = existingChannel?.channelId ?: UUID.randomUUID().toString(),
+                name = finalName,
+                description = channelDescription.trim().ifBlank { null },
+                showsJson = showsJson,
+                channelNumber = resolvedChannelNumber,
+                interleaveStrategy = interleaveStrategy,
+                audioNightMode = audioNightMode,
+                skipBehavior = skipBehavior,
+                resumeBehavior = resumeBehavior,
+                createdAt = existingChannel?.createdAt ?: System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
+            )
+            onSave(entity)
+        }
+    }
 
     // Option Picker TV Dialog
     if (showInterleavePicker) {
@@ -232,14 +262,14 @@ fun ChannelEditorScreen(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 24.dp, bottom = 64.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Header
+        // Header with title and quick action buttons (Cancel & Save)
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
                         text = "VIRTUAL BROADCAST",
                         color = accent,
@@ -261,12 +291,72 @@ fun ChannelEditorScreen(
                         fontSize = 13.sp
                     )
                 }
-                Icon(
-                    imageVector = Icons.Rounded.Tv,
-                    contentDescription = null,
-                    tint = accent,
-                    modifier = Modifier.size(28.dp)
-                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Header Cancel Button
+                    FocusCard(
+                        onClick = onCancel,
+                        shape = RoundedCornerShape(8.dp)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier
+                                .background(if (isFocused) Color.White else Color.White.copy(alpha = 0.08f))
+                                .border(1.dp, if (isFocused) Color.White else Color(0x18FFFFFF), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 14.dp, vertical = 9.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Cancel",
+                                color = if (isFocused) Color.Black else textPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    // Header Save / Create Button
+                    FocusCard(
+                        onClick = doSave,
+                        shape = RoundedCornerShape(8.dp)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    when {
+                                        !canSave -> surfaceVariant.copy(alpha = 0.5f)
+                                        isFocused -> Color.White
+                                        else -> accent
+                                    }
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isFocused) Color.White else Color(0x20FFFFFF),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 16.dp, vertical = 9.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isEditing) Icons.Rounded.Check else Icons.Rounded.Shuffle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(15.dp),
+                                    tint = if (isFocused) Color.Black else if (canSave) Color.White else textSecondary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isEditing) "Save Changes" else "Create Channel",
+                                    color = if (isFocused) Color.Black else if (canSave) Color.White else textSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -944,31 +1034,8 @@ fun ChannelEditorScreen(
                 }
 
                 // Save / Create
-                val defaultName = if (channelNumber >= 3) "Channel $channelNumber" else "Channel 3"
-                val effectiveName = channelName.trim().ifBlank { defaultName }
-                val canSave = selectedSeriesIds.isNotEmpty()
                 FocusCard(
-                    onClick = {
-                        if (canSave) {
-                            val resolvedChannelNumber = (channelNumberText.toIntOrNull() ?: channelNumber).coerceAtLeast(3)
-                            val finalName = channelName.trim().ifBlank { "Channel $resolvedChannelNumber" }
-                            val showsJson = Json.encodeToString(selectedSeriesIds.toList())
-                            val entity = ChannelEntity(
-                                channelId = existingChannel?.channelId ?: UUID.randomUUID().toString(),
-                                name = finalName,
-                                description = channelDescription.trim().ifBlank { null },
-                                showsJson = showsJson,
-                                channelNumber = resolvedChannelNumber,
-                                interleaveStrategy = interleaveStrategy,
-                                audioNightMode = audioNightMode,
-                                skipBehavior = skipBehavior,
-                                resumeBehavior = resumeBehavior,
-                                createdAt = existingChannel?.createdAt ?: System.currentTimeMillis(),
-                                updatedAt = System.currentTimeMillis()
-                            )
-                            onSave(entity)
-                        }
-                    },
+                    onClick = doSave,
                     modifier = Modifier.weight(2f),
                     shape = RoundedCornerShape(8.dp)
                 ) { isFocused ->
