@@ -200,6 +200,7 @@ fun JellycopterAppContent(
                     }
                     deck = resolvedShuffleEngine?.generateMixChannelDeck(
                         channelId = channel.channelId,
+                        channelName = channel.name,
                         shows = showConfigs,
                         episodeProvider = { seriesId -> showEpisodesMap[seriesId] ?: emptyList() }
                     )
@@ -284,6 +285,7 @@ fun JellycopterAppContent(
                                         }
                                         val deck = resolvedShuffleEngine?.generateMixChannelDeck(
                                             channelId = entity.channelId,
+                                            channelName = entity.name,
                                             shows = showConfigs,
                                             episodeProvider = { seriesId -> showEpisodesMap[seriesId] ?: emptyList() }
                                         )
@@ -317,6 +319,7 @@ fun JellycopterAppContent(
                                         }
                                         val deck = resolvedShuffleEngine?.generateMixChannelDeck(
                                             channelId = entity.channelId,
+                                            channelName = entity.name,
                                             shows = showConfigs,
                                             episodeProvider = { seriesId -> showEpisodesMap[seriesId] ?: emptyList() }
                                         )
@@ -446,6 +449,7 @@ fun JellycopterAppContent(
                             NavScreen.HOME -> HomeScreen(
                                 mediaRepository = resolvedMediaRepo,
                                 deckRepository = resolvedDeckRepo,
+                                liveChannels = liveChannels,
                                 onPlayContinueWatching = { item ->
                                     scope.launch {
                                         val ep = resolvedMediaRepo?.getNextUpForSeries(item.id)

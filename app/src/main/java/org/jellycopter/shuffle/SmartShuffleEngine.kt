@@ -26,6 +26,13 @@ interface SmartShuffleEngine {
         episodeProvider: (String) -> List<EpisodeItem>
     ): ShuffledDeck
 
+    fun generateMixChannelDeck(
+        channelId: String,
+        channelName: String,
+        shows: List<ShowConfig>,
+        episodeProvider: (String) -> List<EpisodeItem>
+    ): ShuffledDeck
+
     fun advancePlayback(
         deckId: String,
         currentCardId: String,
@@ -136,6 +143,21 @@ class DefaultSmartShuffleEngine(
         registerDeck(deck, config)
         return deck
     }
+
+    override fun generateMixChannelDeck(
+        channelId: String,
+        channelName: String,
+        shows: List<ShowConfig>,
+        episodeProvider: (String) -> List<EpisodeItem>
+    ): ShuffledDeck = generateMixChannelDeck(
+        channelId = channelId,
+        channelName = channelName,
+        shows = shows,
+        episodeProvider = episodeProvider,
+        config = DeckConfig(),
+        strategy = "ROUND_ROBIN",
+        targetCardCount = null
+    )
 
     fun generateMixChannelDeck(
         channelId: String,

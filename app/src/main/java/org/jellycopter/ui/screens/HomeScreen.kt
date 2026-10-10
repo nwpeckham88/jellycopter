@@ -47,10 +47,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import org.jellycopter.core.database.ChannelEntity
 import org.jellycopter.core.repository.DeckRepository
 import org.jellycopter.core.repository.MediaRepository
 import org.jellycopter.ui.components.ExhaustionBadge
@@ -93,6 +98,7 @@ fun HomeScreen(
     deckRepository: DeckRepository? = null,
     continueWatching: List<ContinueWatchingItem>? = null,
     activeDecks: List<ActiveShuffleDeckItem>? = null,
+    liveChannels: List<ChannelEntity> = emptyList(),
     onPlayContinueWatching: (ContinueWatchingItem) -> Unit = {},
     onResumeDeck: (ActiveShuffleDeckItem) -> Unit = {},
     onSmartShuffleHero: (seriesId: String) -> Unit = {},
@@ -155,20 +161,27 @@ fun HomeScreen(
 
     // Resolve live active decks from DeckRepository if not explicitly provided
     val rawDecks by (deckRepository?.getAllDecks() ?: flowOf(emptyList())).collectAsState(initial = emptyList())
-    val displayDecks = remember(rawDecks, activeDecks) {
+    val displayDecks = remember(rawDecks, activeDecks, liveChannels) {
         if (activeDecks != null) {
             activeDecks
         } else if (rawDecks.isNotEmpty()) {
             rawDecks.map { deck ->
                 val isChannel = deck.channelId != null || deck.deckId.startsWith("channel:")
+                val matchedChannel = liveChannels.find {
+                    it.channelId == deck.channelId ||
+                    "channel:${it.channelId}" == deck.deckId ||
+                    it.channelId == deck.deckId
+                }
                 val currentItem = deck.currentCard?.items?.firstOrNull()
                 val firstItem = deck.cards.firstOrNull()?.items?.firstOrNull()
                 val rawSeriesId = currentItem?.seriesId ?: firstItem?.seriesId ?: deck.seriesId ?: deck.deckId.removePrefix("series:")
                 val effectiveSeriesId = rawSeriesId?.removePrefix("series:")?.removePrefix("channel:")?.trim()
-                val deckTitle = if (isChannel && deck.name.isNotBlank()) {
-                    deck.name
-                } else {
-                    currentItem?.seriesName ?: firstItem?.seriesName ?: deck.name.ifBlank { deck.deckId }
+                val isIdString = deck.name.matches(Regex("^[0-9a-fA-F-]{20,}$"))
+                val deckTitle = when {
+                    matchedChannel != null && matchedChannel.name.isNotBlank() -> matchedChannel.name
+                    isChannel && deck.name.isNotBlank() && !isIdString -> deck.name
+                    !isIdString && deck.name.isNotBlank() -> deck.name
+                    else -> currentItem?.seriesName ?: firstItem?.seriesName ?: deck.name.ifBlank { deck.deckId }
                 }
 
                 val epTicks = currentItem?.runTimeTicks ?: firstItem?.runTimeTicks ?: 0L
@@ -279,10 +292,14 @@ fun HomeScreen(
         isDeckItem = false
     }
 
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(14.dp),
-        contentPadding = PaddingValues(bottom = 36.dp)
+        contentPadding = PaddingValues(top = 16.dp, bottom = 48.dp)
     ) {
         // Hero Spotlight Banner (Apple TV / JellyWatch Cinematic Stage)
         item {
@@ -295,6 +312,13 @@ fun HomeScreen(
                 seriesId = heroSeriesId,
                 showResume = isRealMediaItem,
                 showShuffle = isRealMediaItem || displayDecks.isNotEmpty(),
+                modifier = Modifier.onFocusChanged { state ->
+                    if (state.hasFocus) {
+                        scope.launch {
+                            listState.animateScrollToItem(0, 0)
+                        }
+                    }
+                },
                 onResumeClick = {
                     when {
                         activeSpotlight != null -> onPlayContinueWatching(activeSpotlight)
@@ -480,7 +504,7 @@ private fun HeroBanner(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(185.dp)
+            .height(280.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(JellycopterTheme.colors.surface)
             .border(BorderStroke(1.dp, Color(0x18FFFFFF)), RoundedCornerShape(12.dp))
@@ -600,11 +624,11 @@ private fun HeroBanner(
                 }
             }
 
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 text = title,
-                fontSize = 20.sp,
+                fontSize = 24.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.White,
                 letterSpacing = (-0.5).sp,
@@ -612,18 +636,18 @@ private fun HeroBanner(
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             Text(
                 text = subtitle,
-                fontSize = 11.5.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = JellycopterTheme.colors.primaryAccent,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             // Tech metadata chips row (only if real media)
             if (isRealMedia) {
@@ -636,19 +660,19 @@ private fun HeroBanner(
                     MetadataChip(text = "5.1 AUDIO")
                     MetadataChip(text = "TV-MA")
                 }
-                Spacer(modifier = Modifier.height(3.dp))
+                Spacer(modifier = Modifier.height(6.dp))
             }
 
             Text(
                 text = description,
-                fontSize = 11.5.sp,
+                fontSize = 12.5.sp,
                 color = Color(0xFFCBD5E1),
-                maxLines = 2,
-                lineHeight = 15.sp,
+                maxLines = 3,
+                lineHeight = 17.sp,
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Action Buttons
             if (showResume || showShuffle || (seriesId != null)) {

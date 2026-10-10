@@ -75,8 +75,8 @@ import kotlin.random.Random
  * Applies horizontal CRT scanlines across any composable container.
  */
 fun Modifier.crtScanlines(
-    lineSpacingPx: Float = 4f,
-    lineAlpha: Float = 0.18f
+    lineSpacingPx: Float = 4.5f,
+    lineAlpha: Float = 0.10f
 ): Modifier = this.drawWithContent {
     drawContent()
     val numLines = (size.height / lineSpacingPx).toInt()
@@ -147,12 +147,12 @@ fun CrtScreenTube(
                         brush = Brush.radialGradient(
                             colors = listOf(
                                 Color.Transparent,
-                                Color(0x10000000),
-                                Color(0x40000000),
-                                Color(0x95000000)
+                                Color(0x06000000),
+                                Color(0x22000000),
+                                Color(0x55000000)
                             ),
                             center = Offset(size.width / 2f, size.height / 2f),
-                            radius = size.width.coerceAtLeast(size.height) * 0.72f
+                            radius = size.width.coerceAtLeast(size.height) * 0.82f
                         )
                     )
 

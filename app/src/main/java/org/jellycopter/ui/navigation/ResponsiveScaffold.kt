@@ -214,7 +214,7 @@ private fun TvLeanbackLayout(
     val crtScreenFocusRequester = remember { FocusRequester() }
     val guideFocusRequester = remember { FocusRequester() }
     val libraryFocusRequester = remember { FocusRequester() }
-    val discoverFocusRequester = remember { FocusRequester() }
+    val channelsFocusRequester = remember { FocusRequester() }
     val trophiesFocusRequester = remember { FocusRequester() }
     val settingsFocusRequester = remember { FocusRequester() }
     val dialFocusRequester = remember { FocusRequester() }
@@ -367,7 +367,7 @@ private fun TvLeanbackLayout(
                         right = when (currentScreen) {
                             NavScreen.HOME -> guideFocusRequester
                             NavScreen.LIBRARY -> libraryFocusRequester
-                            NavScreen.DISCOVER -> discoverFocusRequester
+                            NavScreen.CHANNELS -> channelsFocusRequester
                             NavScreen.TROPHY_ROOM -> trophiesFocusRequester
                             NavScreen.SETTINGS -> settingsFocusRequester
                             else -> guideFocusRequester
@@ -557,17 +557,17 @@ private fun TvLeanbackLayout(
                             .focusProperties {
                                 left = crtScreenFocusRequester
                                 up = guideFocusRequester
-                                down = discoverFocusRequester
+                                down = channelsFocusRequester
                             },
                         badgeText = "AUX"
                     )
                     TactilePushButton(
-                        label = "[DISCOVER]",
-                        isSelected = currentScreen == NavScreen.DISCOVER,
-                        onClick = { onScreenSelected(NavScreen.DISCOVER) },
+                        label = "[CHANNELS]",
+                        isSelected = currentScreen == NavScreen.CHANNELS,
+                        onClick = { onScreenSelected(NavScreen.CHANNELS) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .focusRequester(discoverFocusRequester)
+                            .focusRequester(channelsFocusRequester)
                             .focusProperties {
                                 left = crtScreenFocusRequester
                                 up = libraryFocusRequester
@@ -584,7 +584,7 @@ private fun TvLeanbackLayout(
                             .focusRequester(trophiesFocusRequester)
                             .focusProperties {
                                 left = crtScreenFocusRequester
-                                up = discoverFocusRequester
+                                up = channelsFocusRequester
                                 down = settingsFocusRequester
                             },
                         badgeText = "AUX"
